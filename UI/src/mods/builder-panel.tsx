@@ -1,6 +1,6 @@
 import { useValue } from "cs2/api";
 import { getModule } from "cs2/modding";
-import { Scrollable } from "cs2/ui";
+import { Icon, Scrollable } from "cs2/ui";
 import { useState } from "react";
 import { actions, BuilderState, listsBinding, parseLists, parseState, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
 import { Check, loadJson, saveJson, Section, Segmented, Stepper, Switch, useDraggable } from "mods/ui-parts";
@@ -145,10 +145,10 @@ export const BuilderPanel = () => {
             <div className={styles.titleBar} onMouseDown={onHandleDown}>
                 <span className={styles.title}>Block Builder</span>
                 <button className={styles.iconButton} title={t("resetPos")} onMouseDown={(e) => e.stopPropagation()} onClick={reset}>
-                    <img className={styles.glyph} src="Media/Glyphs/ArrowCircular.svg" />
+                    <Icon className={styles.glyph} src="Media/Glyphs/ArrowCircular.svg" tinted />
                 </button>
                 <button className={styles.iconButton} title={t("close")} onMouseDown={(e) => e.stopPropagation()} onClick={actions.toggle}>
-                    <img className={styles.glyph} src="Media/Glyphs/Close.svg" />
+                    <Icon className={styles.glyph} src="Media/Glyphs/Close.svg" tinted />
                 </button>
             </div>
 

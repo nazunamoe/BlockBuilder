@@ -1,4 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "cs2/ui";
 import styles from "./builder-panel.module.scss";
 
 /** localStorage may be missing or throw in the game's UI host; never let that break the panel. */
@@ -107,7 +108,7 @@ export const Section = ({
     <div className={`${styles.section} ${open ? "" : styles.collapsed}`}>
         <div className={styles.sectionHeader}>
             <button className={styles.sectionTitle} onClick={() => onToggle(id)}>
-                <img className={`${styles.chevron} ${open ? "" : styles.chevronClosed}`} src="Media/Glyphs/StrokeArrowDown.svg" />
+                <Icon className={`${styles.chevron} ${open ? "" : styles.chevronClosed}`} src="Media/Glyphs/StrokeArrowDown.svg" tinted />
                 {title}
             </button>
             {extra && <div className={styles.sectionExtra}>{extra}</div>}
@@ -170,6 +171,6 @@ export const Stepper = ({
 
 export const Check = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
     <button className={`${styles.check} ${checked ? styles.checkOn : ""}`} onClick={onClick}>
-        {checked && <img className={styles.glyphSmall} src="Media/Glyphs/Checkmark.svg" />}
+        {checked && <Icon className={styles.glyphSmall} src="Media/Glyphs/Checkmark.svg" tinted />}
     </button>
 );
