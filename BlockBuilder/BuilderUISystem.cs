@@ -119,7 +119,10 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchText", s => { m_SearchText = s ?? string.Empty; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c => { m_SearchCategory = c; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchTheme", s => { m_SearchTheme = s ?? string.Empty; m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMaxSize", n => { m_SearchMaxSize = System.Math.Max(0, System.Math.Min(12, n)); m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidth", n => { m_SearchWidth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidthOp", n => { m_SearchWidthOp = ToCompare(n); m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchDepth", n => { m_SearchDepth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchDepthOp", n => { m_SearchDepthOp = ToCompare(n); m_SearchKey = null; }));
         }
 
         // ---- List (preset) management ----
@@ -133,7 +136,13 @@ namespace BlockBuilder
         private string m_SearchText = string.Empty;
         private int m_SearchCategory = -1;
         private string m_SearchTheme = string.Empty;
-        private int m_SearchMaxSize;
+        // Lot size filter in cells (0 = any), each with its own < / = / > comparison.
+        private int m_SearchWidth;
+        private int m_SearchDepth;
+        private Core.SizeCompare m_SearchWidthOp = Core.SizeCompare.Equal;
+        private Core.SizeCompare m_SearchDepthOp = Core.SizeCompare.Equal;
+
+        private static Core.SizeCompare ToCompare(int n) => n == 0 ? Core.SizeCompare.Less : n == 2 ? Core.SizeCompare.Greater : Core.SizeCompare.Equal;
         private string m_SearchKey;
 
         private static void Select(string path)
@@ -283,11 +292,8 @@ namespace BlockBuilder
                 filter.Themes.Add(m_SearchTheme);
             }
 
-            if (m_SearchMaxSize > 0)
-            {
-                filter.MaxWidth = m_SearchMaxSize;
-                filter.MaxDepth = m_SearchMaxSize;
-            }
+            filter.SetWidth(m_SearchWidthOp, m_SearchWidth);
+            filter.SetDepth(m_SearchDepthOp, m_SearchDepth);
 
             return m_Catalog.Buildings.Where(b => filter.Matches(b.Item)).GroupBy(b => b.Name).Select(g => g.First()).ToList();
         }
@@ -302,7 +308,10 @@ namespace BlockBuilder
             Prop(sb, "total", all.Count);
             Prop(sb, "category", m_SearchCategory);
             Prop(sb, "theme", m_SearchTheme);
-            Prop(sb, "maxSize", m_SearchMaxSize);
+            Prop(sb, "width", m_SearchWidth);
+            Prop(sb, "widthOp", (int)m_SearchWidthOp);
+            Prop(sb, "depth", m_SearchDepth);
+            Prop(sb, "depthOp", (int)m_SearchDepthOp);
             Prop(sb, "text", m_SearchText);
             Prop(sb, "maxAddAll", kMaxAddAll);
             sb.Append("\"results\":[");
@@ -398,7 +407,7 @@ namespace BlockBuilder
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchMaxSize}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
+                string searchKey = $"{m_SearchText}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;

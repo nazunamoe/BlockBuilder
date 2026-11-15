@@ -62,7 +62,10 @@ export interface Search {
     total: number;
     category: number;
     theme: string;
-    maxSize: number;
+    width: number;
+    widthOp: number;
+    depth: number;
+    depthOp: number;
     text: string;
     maxAddAll: number;
     results: SearchResult[];
@@ -75,7 +78,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, max: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, category: -1, theme: "", maxSize: 0, text: "", maxAddAll: 300, results: [], categories: [], themes: [] };
+const emptySearch: Search = { total: 0, category: -1, theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], categories: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {
@@ -159,7 +162,10 @@ export const actions = {
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
     setSearchCategory: (c: number) => trigger(GROUP, "setSearchCategory", c),
     setSearchTheme: (s: string) => trigger(GROUP, "setSearchTheme", s),
-    setSearchMaxSize: (n: number) => trigger(GROUP, "setSearchMaxSize", n),
+    setSearchWidth: (n: number) => trigger(GROUP, "setSearchWidth", n),
+    setSearchWidthOp: (op: number) => trigger(GROUP, "setSearchWidthOp", op),
+    setSearchDepth: (n: number) => trigger(GROUP, "setSearchDepth", n),
+    setSearchDepthOp: (op: number) => trigger(GROUP, "setSearchDepthOp", op),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
     setFillInterior: (b: boolean) => trigger(GROUP, "setFillInterior", b),
     setBlockLength: (n: number) => trigger(GROUP, "setBlockLength", n),

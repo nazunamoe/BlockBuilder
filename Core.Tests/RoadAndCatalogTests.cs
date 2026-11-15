@@ -251,4 +251,40 @@ namespace BlockBuilder.Core.Tests
             Assert.Equal(new[] { 0, 2, 4 }, Polyline.Simplify(bend, 0.5));
         }
     }
+
+    public class SizeFilterTests
+    {
+        [Theory]
+        [InlineData(SizeCompare.Less, 3, 1, 2)]
+        [InlineData(SizeCompare.Equal, 3, 3, 3)]
+        [InlineData(SizeCompare.Greater, 3, 4, int.MaxValue)]
+        [InlineData(SizeCompare.Less, 1, 1, 0)] // "< 1" matches nothing
+        [InlineData(SizeCompare.Greater, 0, 1, int.MaxValue)] // 0 = any
+        [InlineData(SizeCompare.Equal, 0, 1, int.MaxValue)]
+        public void SizeRange_IsStrictAsWritten(SizeCompare compare, int value, int min, int max)
+        {
+            CatalogFilter.SizeRange(compare, value, out int lo, out int hi);
+            Assert.Equal(min, lo);
+            Assert.Equal(max, hi);
+        }
+
+        [Fact]
+        public void WidthAndDepth_FilterSeparately()
+        {
+            CatalogItem Lot(string name, int w, int d) => new CatalogItem { Name = name, Kind = ItemKind.Growable, Zone = "EU Residential Low", AreaType = "Residential", LotWidth = w, LotDepth = d };
+            var items = new[] { Lot("2x3", 2, 3), Lot("3x2", 3, 2), Lot("3x4", 3, 4), Lot("4x4", 4, 4) };
+
+            var filter = new CatalogFilter();
+            filter.SetWidth(SizeCompare.Equal, 3);
+            filter.SetDepth(SizeCompare.Greater, 2);
+            Assert.Equal(new[] { "3x4" }, filter.Apply(items).Select(i => i.Name));
+
+            filter = new CatalogFilter();
+            filter.SetWidth(SizeCompare.Less, 4);
+            Assert.Equal(new[] { "2x3", "3x2", "3x4" }, filter.Apply(items).Select(i => i.Name));
+
+            filter.SetDepth(SizeCompare.Less, 3);
+            Assert.Equal(new[] { "3x2" }, filter.Apply(items).Select(i => i.Name));
+        }
+    }
 }

@@ -181,6 +181,53 @@ export const Stepper = ({
 );
 
 /**
+ * Lot size filter row like Find It: a comparison (< = >) and a cell count; 0 means any size.
+ * One cell is 8 m, shown next to the count.
+ */
+export const SizeFilter = ({
+    label,
+    value,
+    op,
+    anyLabel,
+    onValue,
+    onOp,
+}: {
+    label: string;
+    value: number;
+    op: number;
+    anyLabel: string;
+    onValue: (v: number) => void;
+    onOp: (op: number) => void;
+}) => (
+    <div className={styles.sizeRow}>
+        <span className={styles.sizeLabel}>{label}</span>
+        <div className={`${styles.opGroup} ${value === 0 ? styles.disabled : ""}`}>
+            {["<", "=", ">"].map((s, i) => (
+                <button key={i} className={`${styles.opButton} ${op === i ? styles.opOn : ""}`} disabled={value === 0} onClick={() => onOp(i)}>
+                    {s}
+                </button>
+            ))}
+        </div>
+        <button className={styles.stepButton} onClick={() => onValue(Math.max(0, value - 1))}>
+            -
+        </button>
+        <span className={styles.sizeValue}>
+            {value === 0 ? (
+                anyLabel
+            ) : (
+                <>
+                    {value}
+                    <small>{`${value * 8}m`}</small>
+                </>
+            )}
+        </span>
+        <button className={styles.stepButton} onClick={() => onValue(value + 1)}>
+            +
+        </button>
+    </div>
+);
+
+/**
  * The game's own text input: while it has focus the game's shortcuts are suspended, so typing a
  * name does not trigger tools. Falls back to a plain input if the module is not found.
  */

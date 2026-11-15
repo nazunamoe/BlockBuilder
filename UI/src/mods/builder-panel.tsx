@@ -4,7 +4,7 @@ import { Scrollable } from "cs2/ui";
 import { useEffect, useRef, useState } from "react";
 import { actions, BuilderState, DENSITY, Lists, listsBinding, parseLists, parseSearch, parseState, Search, searchBinding, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
 import { T } from "mods/texts";
-import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
+import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, SizeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
 import styles from "./builder-panel.module.scss";
 
 /** The game's own tool options toolbar (snapping buttons), shown inside the builder panel. */
@@ -277,7 +277,9 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                 </div>
             )}
 
-            <Stepper label={t("maxSize")} value={search.maxSize} display={search.maxSize === 0 ? t("noLimit") : undefined} unit="" step={1} onChange={actions.setSearchMaxSize} />
+            <div className={styles.fieldLabel}>{t("lotSize")}</div>
+            <SizeFilter label={t("lotWidth")} value={search.width} op={search.widthOp} anyLabel={t("anySize")} onValue={actions.setSearchWidth} onOp={actions.setSearchWidthOp} />
+            <SizeFilter label={t("lotDepth")} value={search.depth} op={search.depthOp} anyLabel={t("anySize")} onValue={actions.setSearchDepth} onOp={actions.setSearchDepthOp} />
 
             <div className={styles.resultHeader}>
                 <span>

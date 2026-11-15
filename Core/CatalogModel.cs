@@ -157,9 +157,49 @@ namespace BlockBuilder.Core
         Mods,
     }
 
+    /// <summary>Comparison for a lot dimension in the search (like Find It's size filter).</summary>
+    public enum SizeCompare
+    {
+        Less,
+        Equal,
+        Greater,
+    }
+
     /// <summary>User-facing catalog filter. Empty sets mean "any".</summary>
     public sealed class CatalogFilter
     {
+        /// <summary>
+        /// Inclusive cell range for "size &lt;/=/&gt; value". A value of 0 or less means any size.
+        /// Comparisons are strict, as written: "&lt; 3" is 1-2 cells, "&gt; 3" is 4 or more.
+        /// </summary>
+        public static void SizeRange(SizeCompare compare, int value, out int min, out int max)
+        {
+            min = 1;
+            max = int.MaxValue;
+            if (value <= 0)
+            {
+                return;
+            }
+
+            switch (compare)
+            {
+                case SizeCompare.Less:
+                    max = value - 1;
+                    break;
+                case SizeCompare.Greater:
+                    min = value + 1;
+                    break;
+                default:
+                    min = value;
+                    max = value;
+                    break;
+            }
+        }
+
+        public void SetWidth(SizeCompare compare, int value) => SizeRange(compare, value, out MinWidth, out MaxWidth);
+
+        public void SetDepth(SizeCompare compare, int value) => SizeRange(compare, value, out MinDepth, out MaxDepth);
+
         public HashSet<ItemCategory> Categories = new HashSet<ItemCategory>();
         public HashSet<string> Themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public int MinWidth = 1;
