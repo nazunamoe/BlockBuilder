@@ -32,6 +32,17 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
     const steps = [t("stepDraw"), t("stepPreview"), t("stepBuild")];
     return (
         <div className={styles.card}>
+            <div className={styles.selectRow}>
+                <Segmented
+                    value={state.selection}
+                    onChange={actions.setSelection}
+                    options={[
+                        { value: 0, label: t("selectBlock") },
+                        { value: 1, label: t("selectDraw") },
+                    ]}
+                />
+                {state.selection === 0 && <Stepper label={t("brush")} value={state.brush} unit="m" step={4} onChange={actions.setBrush} />}
+            </div>
             <div className={styles.steps}>
                 {steps.map((s, i) => (
                     <div key={i} className={`${styles.stepChip} ${i === current ? styles.stepCurrent : i < current ? styles.stepDone : ""}`}>
@@ -43,6 +54,12 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
             {state.planned ? (
                 <>
                     <div className={styles.stats}>
+                        {state.picked && (
+                            <div className={styles.stat}>
+                                <b>{state.blocks}</b>
+                                <span>{t("blocksSelected")}</span>
+                            </div>
+                        )}
                         <div className={styles.stat}>
                             <b>{state.buildings}</b>
                             <span>{t("buildings")}</span>
@@ -56,10 +73,12 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
                             <span>{t("designated")}</span>
                         </div>
                     </div>
-                    <div className={styles.hint}>{t("plannedHint")}</div>
+                    <div className={styles.hint}>{t(state.picked ? "plannedHintPicked" : "plannedHint")}</div>
                 </>
             ) : (
-                <div className={styles.hint}>{state.corners === 0 ? t("drawStart") : `${t("drawMore")} (${state.corners} ${t("corners")})`}</div>
+                <div className={styles.hint}>
+                    {state.selection === 0 ? t("blockHint") : state.corners === 0 ? t("drawStart") : `${t("drawMore")} (${state.corners} ${t("corners")})`}
+                </div>
             )}
             {state.status !== "" && <div className={styles.status}>{state.status}</div>}
             {state.warnings.map((w, i) => (
@@ -160,9 +179,9 @@ function ListPicker({ state, lists, t }: { state: BuilderState; lists: Lists; t:
     );
 }
 
-/** The buildings of the current list: pick one to Shift+click, tick to fill with, remove in edit mode. */
+/** The buildings of the current list: pick one to Shift+click, tick to fill with, remove with the X. */
 function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void }) {
-    const [editing, setEditing] = useState(false);
+    const [confirmClear, setConfirmClear] = useState(false);
     const onlyChecked = state.scope === 1;
     const hasList = lists.palettes[state.palette] !== undefined;
 
@@ -176,17 +195,17 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
             />
 
             <div className={styles.listHeader}>
-                <span className={styles.note}>{editing ? t("itemsHintEdit") : t("placeHint")}</span>
+                <span className={styles.note}>{t("placeHint")}</span>
             </div>
 
             <div className={styles.toolbar}>
                 <button className={`${styles.chip} ${styles.chipPrimary}`} disabled={!hasList} onClick={onAdd}>
                     + {t("addBuildings")}
                 </button>
-                <button className={`${styles.chip} ${editing ? styles.chipOn : ""}`} disabled={lists.entries.length === 0} onClick={() => setEditing(!editing)}>
-                    {t(editing ? "done" : "edit")}
+                <button className={`${styles.chip} ${styles.chipDangerText}`} disabled={lists.entries.length === 0} onClick={() => setConfirmClear(true)}>
+                    {t("clearItems")}
                 </button>
-                {onlyChecked && !editing && (
+                {onlyChecked && (
                     <>
                         <button className={styles.chip} onClick={() => actions.checkAll(true)}>
                             {t("checkAll")}
@@ -198,25 +217,45 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                 )}
             </div>
 
+            {confirmClear && lists.entries.length > 0 && (
+                <div className={styles.prompt}>
+                    <div className={styles.promptLabel}>
+                        {t("confirmClearItems")} <b>{lists.palettes[state.palette]?.name}</b> ({lists.entries.length})
+                    </div>
+                    <div className={styles.promptRow}>
+                        <button
+                            className={`${styles.chip} ${styles.chipDanger}`}
+                            onClick={() => {
+                                actions.clearItems();
+                                setConfirmClear(false);
+                            }}
+                        >
+                            {t("clearItems")}
+                        </button>
+                        <button className={styles.chip} onClick={() => setConfirmClear(false)}>
+                            {t("cancel")}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
             ) : (
                 <Scrollable className={styles.itemList} vertical>
                     {lists.entries.map((e, i) => {
-                        const selected = i === state.designate && !editing;
+                        const selected = i === state.designate;
                         return (
                             <div key={i} className={`${styles.itemRow} ${selected ? styles.rowOn : ""} ${e.loaded ? "" : styles.dim}`}>
-                                {onlyChecked && !editing && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
-                                <button className={styles.itemName} onClick={() => !editing && actions.setDesignate(i)}>
+                                {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
+                                <button className={styles.itemName} onClick={() => actions.setDesignate(i)}>
                                     <span className={styles.name}>{e.name}</span>
                                     {selected && <span className={styles.tag}>{t("selected")}</span>}
                                     <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
                                 </button>
-                                {editing && (
-                                    <button className={`${styles.chip} ${styles.chipDangerText} ${styles.rowAction}`} onClick={() => actions.removeItem(i)}>
-                                        {t("remove")}
-                                    </button>
-                                )}
+                                <button className={styles.removeButton} title={t("removeFromList")} onClick={() => actions.removeItem(i)}>
+                                    <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
+                                </button>
                             </div>
                         );
                     })}
@@ -225,7 +264,6 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
         </>
     );
 }
-
 /** Catalog search that adds to the current list; replaces the list view until Back. */
 function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void }) {
     // Start from the text the C# side still filters by (it survives a UI reload).
@@ -302,7 +340,9 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                                 <span className={styles.badge}>{r.size}</span>
                             </div>
                             {r.inList ? (
-                                <span className={`${styles.badge} ${styles.rowAction}`}>{t("inList")}</span>
+                                <button className={`${styles.chip} ${styles.chipDangerText} ${styles.rowAction}`} onClick={() => actions.removeItemByName(r.name)}>
+                                    {t("remove")}
+                                </button>
                             ) : (
                                 <button className={`${styles.chip} ${styles.chipPrimary} ${styles.rowAction}`} disabled={!current} onClick={() => actions.addItem(r.name)}>
                                     {t("add")}
@@ -476,7 +516,10 @@ export const BuilderPanel = () => {
             </div>
 
             <div className={styles.footer}>
-                <button className={`${styles.button} ${styles.primary}`} onClick={actions.shuffle}>
+                <button className={`${styles.button} ${styles.primary}`} disabled={!state.planned || state.buildings + state.streets === 0} onClick={actions.build}>
+                    {t("build")}
+                </button>
+                <button className={styles.button} onClick={actions.shuffle}>
                     {t("shuffle")}
                 </button>
                 <button className={styles.button} onClick={actions.clearArea}>

@@ -935,3 +935,46 @@ $radius: 6rem;
         font-size: 11rem;
     }
 }
+
+.selectRow {
+    width: 100%;
+    margin-bottom: 8rem;
+
+    .segmented {
+        margin-top: 0;
+    }
+}
+
+.button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+// Remove-from-list button at the end of each building row.
+.removeButton {
+    flex-shrink: 0;
+    width: 24rem;
+    height: 24rem;
+    margin: 0 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border: none;
+    border-radius: $radius;
+    cursor: pointer;
+
+    &:hover {
+        background-color: rgba(232, 96, 72, 0.25);
+
+        .removeGlyph {
+            background-color: rgba(255, 150, 130, 1);
+        }
+    }
+}
+
+.removeGlyph {
+    width: 10rem;
+    height: 10rem;
+    background-color: $muted;
+}

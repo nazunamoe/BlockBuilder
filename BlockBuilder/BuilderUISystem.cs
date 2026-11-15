@@ -85,6 +85,17 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSelection", n =>
+            {
+                var mode = n == 1 ? AreaSelect.Draw : AreaSelect.Paint;
+                if (Mod.Options != null && Mod.Options.Selection != mode)
+                {
+                    m_Tool.ClearArea(); // corners or a picked ring do not carry over between modes
+                    Edit(o => o.Selection = mode);
+                }
+            }));
+            AddBinding(new TriggerBinding(kGroup, "build", () => m_Tool.RequestApply()));
+            AddBinding(new TriggerBinding<int>(kGroup, "setBrush", n => Edit(o => o.BrushRadius = System.Math.Max(4, System.Math.Min(80, n)))));
             AddBinding(new TriggerBinding<int>(kGroup, "setDensity", n => Edit(o =>
             {
                 o.Density = n >= 0 && n <= 3 ? (FillDensity)n : FillDensity.Normal;
@@ -103,6 +114,28 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<string>(kGroup, "renameList", RenameList));
             AddBinding(new TriggerBinding(kGroup, "deleteList", DeleteList));
             AddBinding(new TriggerBinding<int>(kGroup, "removeItem", RemoveItem));
+            AddBinding(new TriggerBinding(kGroup, "clearItems", () =>
+            {
+                var options = Mod.Options;
+                var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
+                if (palette == null || palette.Entries.Count == 0)
+                {
+                    return;
+                }
+
+                palette.Entries.Clear();
+                PaletteStore.Update(options.ActivePalette);
+                Edit(o => o.DesignateItem = 0);
+            }));
+            AddBinding(new TriggerBinding<string>(kGroup, "removeItemByName", name =>
+            {
+                var palette = Mod.Options == null ? null : PaletteStore.Get(Mod.Options.ActivePalette);
+                int index = palette?.Entries.FindIndex(e => e.Prefab == name) ?? -1;
+                if (index >= 0)
+                {
+                    RemoveItem(index);
+                }
+            }));
             AddBinding(new TriggerBinding<string>(kGroup, "addItem", name => AddItems(new[] { name })));
             AddBinding(new TriggerBinding(kGroup, "addResults", () =>
             {
@@ -440,6 +473,10 @@ namespace BlockBuilder
             Prop(sb, "scope", o.Scope == ItemScope.Checked ? 1 : 0);
             Prop(sb, "fillRest", !o.PlacedOnly);
             Prop(sb, "snapOff", o.SnapOff);
+            Prop(sb, "selection", (int)o.Selection);
+            Prop(sb, "picked", m_Tool.IsPicked);
+            Prop(sb, "blocks", m_Tool.BlockCount);
+            Prop(sb, "brush", (int)BuilderTool.BrushRadius(o));
             Prop(sb, "density", (int)o.Density);
             Prop(sb, "overlapSide", o.OverlapSide);
             Prop(sb, "overlapBack", o.OverlapBack);

@@ -41,6 +41,10 @@ namespace BlockBuilder
                 "지정할 항목", "영역을 닫은 뒤 Shift+클릭하면 이 항목을 가장 가까운 도로에 붙여 놓습니다. 지정한 항목 위에서 Shift+오른쪽 클릭하면 그 항목을 지웁니다 (빈 곳에서는 마지막 항목).");
             d[s.GetEnumValueLocaleID(FillMode.Fill)] = ko ? "채우기" : "Fill";
             d[s.GetEnumValueLocaleID(FillMode.FixedOnly)] = ko ? "지정만" : "Designated only";
+            Opt(nameof(Setting.Selection), "Area selection", "Paint: brush the area freely (left drag paints, right drag or Ctrl+drag erases). Roads are walls: they are never painted and the edge hugs the curb, curves included. Draw: click the corners yourself.",
+                "영역 선택 방식", "칠하기: 브러시로 자유롭게 칠합니다(왼쪽 드래그 칠하기, 오른쪽 드래그나 Ctrl+드래그 지우기). 도로는 벽처럼 칠해지지 않고, 경계는 곡선까지 연석에 맞춰집니다. 직접 그리기: 꼭짓점을 직접 찍습니다.");
+            d[s.GetEnumValueLocaleID(AreaSelect.Paint)] = ko ? "칠하기" : "Paint";
+            d[s.GetEnumValueLocaleID(AreaSelect.Draw)] = ko ? "직접 그리기" : "Draw";
             Opt(nameof(Setting.Density), "Fill density", "Relaxed leaves 4 m between lots. Dense searches every 2 m to fill odd gaps. Max is Dense plus the overlap allowances below and needs the Anarchy mod switched on.",
                 "채움 강도", "여유: 필지 사이를 4m 띄웁니다. 촘촘: 2m 단위로 빈틈까지 찾습니다. 최대: 촘촘 + 아래 겹침 허용, Anarchy 모드를 켜야 적용됩니다.");
             d[s.GetEnumValueLocaleID(FillDensity.Relaxed)] = ko ? "여유" : "Relaxed";

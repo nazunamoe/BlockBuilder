@@ -15,6 +15,10 @@ export interface BuilderState {
     scope: number;
     fillRest: boolean;
     snapOff: number;
+    selection: number;
+    picked: boolean;
+    blocks: number;
+    brush: number;
     density: number;
     overlapSide: number;
     overlapBack: number;
@@ -103,6 +107,10 @@ const emptyState: BuilderState = {
     scope: 0,
     fillRest: true,
     snapOff: 0,
+    selection: 0,
+    picked: false,
+    blocks: 0,
+    brush: 16,
     density: 0,
     overlapSide: 0,
     overlapBack: 0,
@@ -150,6 +158,9 @@ export const actions = {
     setOverlapBack: (n: number) => trigger(GROUP, "setOverlapBack", n),
     /** Anarchy's own UI trigger (group "Anarchy"); only call when Anarchy is installed. */
     toggleAnarchy: () => trigger("Anarchy", "AnarchyToggled"),
+    setSelection: (n: number) => trigger(GROUP, "setSelection", n),
+    setBrush: (n: number) => trigger(GROUP, "setBrush", n),
+    build: () => trigger(GROUP, "build"),
     setDensity: (n: number) => trigger(GROUP, "setDensity", n),
     newList: (name: string) => trigger(GROUP, "newList", name),
     newListFromChecked: (name: string) => trigger(GROUP, "newListFromChecked", name),
@@ -157,6 +168,8 @@ export const actions = {
     renameList: (name: string) => trigger(GROUP, "renameList", name),
     deleteList: () => trigger(GROUP, "deleteList"),
     removeItem: (i: number) => trigger(GROUP, "removeItem", i),
+    removeItemByName: (name: string) => trigger(GROUP, "removeItemByName", name),
+    clearItems: () => trigger(GROUP, "clearItems"),
     addItem: (name: string) => trigger(GROUP, "addItem", name),
     addResults: () => trigger(GROUP, "addResults"),
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),

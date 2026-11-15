@@ -147,6 +147,7 @@ namespace BlockBuilder
             m_PendingClick = false;
             m_PlanKey = string.Empty;
             m_Submitted = 0;
+            InvalidateGraph(); // roads may have changed while another tool was active
             Mod.log.Info($"builder: started state={m_State} corners={m_Points.Count} designated={m_Fixed.Count}");
         }
 
@@ -171,6 +172,11 @@ namespace BlockBuilder
 
         private void ResetAll()
         {
+            m_Picked = false;
+            m_Paint?.Clear();
+            m_Regions = new List<PaintRegion>();
+            m_StrokeActive = false;
+            m_LastPaint = new float2(float.MaxValue);
             m_Points.Clear();
             m_Fixed.Clear();
             m_State = State.Drawing;
@@ -226,6 +232,17 @@ namespace BlockBuilder
                 return inputDeps;
             }
 
+            if (m_ApplyRequested)
+            {
+                m_ApplyRequested = false;
+                if (m_State == State.Planned && PlanKey(options) == m_PlanKey)
+                {
+                    StartApply();
+                    DrawOverlay();
+                    return inputDeps;
+                }
+            }
+
             // The game's Apply/Cancel actions do not fire while a modifier is held, so Shift+click
             // is read from the raw mouse. Nothing reacts while the cursor is over the UI (the panel),
             // so a click on a panel button can never place or commit anything.
@@ -233,6 +250,7 @@ namespace BlockBuilder
             var mouse = UnityEngine.InputSystem.Mouse.current;
             bool shift = keyboard != null && keyboard.shiftKey.isPressed;
             bool overUI = Game.Input.InputManager.instance != null && Game.Input.InputManager.instance.mouseOverUI;
+            FinishStrokeIfReleased(mouse); // before the panel check: a stroke may be released over the panel
             if (overUI)
             {
                 DrawOverlay();
@@ -270,9 +288,48 @@ namespace BlockBuilder
                 return inputDeps;
             }
 
+            if (options.Selection == AreaSelect.Paint)
+            {
+                if (shiftLeft)
+                {
+                    if (m_State == State.Planned && m_HasCursor)
+                    {
+                        Designate(options);
+                    }
+                    else
+                    {
+                        Note("paint blocks first, then shift+click to place a building", "먼저 블록을 칠한 뒤 Shift+클릭으로 건물을 놓으세요");
+                    }
+                }
+
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame && !shift && (m_Paint == null || m_Paint.IsEmpty) && !m_StrokeActive)
+                {
+                    // Nothing painted: right click leaves the tool, as in draw mode.
+                    ResetAll();
+                    m_ToolSystem.activeTool = m_DefaultTool;
+                    return inputDeps;
+                }
+
+                Paint(options, mouse, shift);
+                DrawOverlay();
+                if (m_State == State.Planned)
+                {
+                    return ReplanIfChanged(options, inputDeps);
+                }
+
+                return m_Submitted > 0 ? ClearPreview(inputDeps) : inputDeps;
+            }
+
             if (!shift && secondaryApplyAction.WasPressedThisFrame())
             {
-                if (m_State == State.Planned)
+                if (m_State == State.Planned && m_Picked)
+                {
+                    // A picked block has hundreds of corners: clear it instead of removing them one by one.
+                    inputDeps = ClearPreview(inputDeps);
+                    ResetAll();
+                    Mod.log.Info("builder: picked block cleared");
+                }
+                else if (m_State == State.Planned)
                 {
                     m_State = State.Drawing;
                     Mod.log.Info("builder: back to drawing");
@@ -338,21 +395,171 @@ namespace BlockBuilder
             }
             else if (click)
             {
-                if (m_Submitted == 0)
-                {
-                    Note("nothing to build (empty plan); check the list and the area", "지을 것이 없습니다. 리스트와 영역을 확인하세요");
-                }
-                else
-                {
-                    m_PendingClick = true;
-                    m_SettleFrames = 0;
-                    m_StableFrames = 0;
-                    m_LastTempCount = -1;
-                }
+                StartApply();
             }
 
             DrawOverlay();
             return inputDeps;
+        }
+
+        /// <summary>Build the current preview once it has settled (left click in draw mode, or the Build button).</summary>
+        private void StartApply()
+        {
+            if (m_Submitted == 0)
+            {
+                Note("nothing to build (empty plan); check the list and the area", "지을 것이 없습니다. 리스트와 영역을 확인하세요");
+                return;
+            }
+
+            m_PendingClick = true;
+            m_SettleFrames = 0;
+            m_StableFrames = 0;
+            m_LastTempCount = -1;
+        }
+
+        // ---- Brush painting (like Placemaker's paint mode): roads are walls, lots fill the paint ----
+
+        /// <summary>Roads around the first stroke are collected this far out; strokes further away rebuild.</summary>
+        private const float kPaintRoadRadius = 800f;
+        private const float kDefaultBrush = 16f;
+
+        private PaintArea m_Paint;
+        private float2 m_PaintCenter = new float2(float.MaxValue);
+        private bool m_PaintStale;
+        private List<PaintRegion> m_Regions = new List<PaintRegion>();
+        private float2 m_LastPaint = new float2(float.MaxValue);
+        private bool m_ApplyRequested;
+        private bool m_StrokeActive;
+        private bool m_StrokeErase;
+        private int m_StrokeFrames;
+        /// <summary>The current area is painted (its rings already reach past the curbs).</summary>
+        private bool m_Picked;
+
+        internal bool IsPicked => m_Picked;
+
+        internal int BlockCount => m_Regions.Count;
+
+        internal static float BrushRadius(Setting options) => options.BrushRadius > 0 ? options.BrushRadius : kDefaultBrush;
+
+        /// <summary>Build button in the panel (painting uses the mouse buttons, so it cannot build on click).</summary>
+        internal void RequestApply() => m_ApplyRequested = true;
+
+        /// <summary>Roads may have changed (tool restarted, build applied): rebuild the walls at the next stroke.</summary>
+        private void InvalidateGraph() => m_PaintStale = true;
+
+        /// <summary>Paint grid with the roads around <paramref name="at"/>; keeps what is painted when rebuilt.</summary>
+        private void EnsurePaint(float2 at)
+        {
+            if (m_Paint != null && !m_PaintStale && math.distance(m_PaintCenter, at) <= kPaintRoadRadius - 400f)
+            {
+                return;
+            }
+
+            var roads = new List<RoadSegment>();
+            CollectRoadSegments(new Bounds2(at - kPaintRoadRadius, at + kPaintRoadRadius), roads, new List<RoadRef>());
+            var fresh = new PaintArea(roads);
+            if (m_Paint != null)
+            {
+                foreach (var (i, j) in m_Paint.Cells)
+                {
+                    fresh.PaintCell(i, j);
+                }
+            }
+
+            m_Paint = fresh;
+            m_PaintCenter = at;
+            m_PaintStale = false;
+        }
+
+        /// <summary>
+        /// Left drag paints, right drag or Ctrl+left drag erases. A paint stroke only covers land
+        /// reachable from where it started without crossing a road; at the end of a stroke a small gap
+        /// to a curb is closed and the painted regions are planned.
+        /// </summary>
+        private void Paint(Setting options, UnityEngine.InputSystem.Mouse mouse, bool shift)
+        {
+            if (!m_HasCursor || mouse == null)
+            {
+                return;
+            }
+
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            bool ctrl = keyboard != null && keyboard.ctrlKey.isPressed;
+            bool pressed = (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame) && !shift;
+            if (pressed && !m_StrokeActive)
+            {
+                // The press is on the map (this code does not run over the panel).
+                EnsurePaint(m_Cursor.xz);
+                m_StrokeErase = mouse.rightButton.wasPressedThisFrame || ctrl;
+                m_StrokeActive = true;
+                m_StrokeFrames = 0;
+                m_LastPaint = m_Cursor.xz;
+                if (!m_StrokeErase && !m_Paint.BeginStroke(new Vec2(m_Cursor.x, m_Cursor.z)))
+                {
+                    m_StrokeActive = false;
+                    Note("a stroke cannot start on a road; start on the land you want", "도로 위에서는 칠하기를 시작할 수 없습니다. 칠할 땅에서 시작하세요");
+                    return;
+                }
+            }
+
+            if (!m_StrokeActive)
+            {
+                return;
+            }
+
+            float r = BrushRadius(options);
+            var from = new Vec2(m_LastPaint.x, m_LastPaint.y);
+            var to = new Vec2(m_Cursor.x, m_Cursor.z);
+            if (m_Paint.Stroke(from, to, r, m_StrokeErase) && ++m_StrokeFrames % 4 == 0)
+            {
+                m_Regions = m_Paint.Regions(); // live outline while painting (planned at the end)
+            }
+
+            m_LastPaint = m_Cursor.xz;
+        }
+
+        /// <summary>Ends a stroke once no mouse button is held (also when released over the panel).</summary>
+        private void FinishStrokeIfReleased(UnityEngine.InputSystem.Mouse mouse)
+        {
+            if (!m_StrokeActive || (mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed)))
+            {
+                return;
+            }
+
+            m_StrokeActive = false;
+            if (!m_StrokeErase)
+            {
+                m_Paint.EndStroke();
+            }
+
+            SyncPaint();
+        }
+
+        /// <summary>After the painted area changes: regions, bounding points, state and a fresh plan.</summary>
+        private void SyncPaint()
+        {
+            m_Regions = m_Paint == null ? new List<PaintRegion>() : m_Paint.Regions();
+            m_Points.Clear();
+            foreach (var region in m_Regions)
+            {
+                foreach (var v in region.Ring)
+                {
+                    m_Points.Add(new float3((float)v.X, m_Cursor.y, (float)v.Y)); // used for bounds only
+                }
+            }
+
+            m_Picked = m_Regions.Count > 0;
+            m_State = m_Picked ? State.Planned : State.Drawing;
+            m_PlanKey = string.Empty;
+            double area = m_Regions.Sum(x => x.Area);
+            if (m_Picked)
+            {
+                Note($"painted {area:0} m2 in {m_Regions.Count} area(s)", $"칠한 면적 {area:0}m² (영역 {m_Regions.Count}개)");
+            }
+            else
+            {
+                m_Status = string.Empty;
+            }
         }
 
         // ---- Corner snapping while drawing ----
@@ -578,6 +785,10 @@ namespace BlockBuilder
 
             m_Points.Clear();
             m_Fixed.Clear();
+            m_Paint?.Clear();
+            m_Regions = new List<PaintRegion>();
+            m_Picked = false;
+            InvalidateGraph(); // the build may have added streets
             m_State = State.Drawing;
             m_Plan = null;
             m_Submitted = 0;
@@ -663,6 +874,8 @@ namespace BlockBuilder
                     FillInterior = options.FillInterior,
                     Seed = options.Seed,
                     Mode = options.PlacementMode,
+                    // A picked block's ring is already the curb line; re-snapping could only distort it.
+                    SnapBoundaryToCurbs = !m_Picked,
                     OverlapSide = EffectiveSide(options),
                     OverlapBack = EffectiveBack(options),
                     Gap = DensityGap(options),
@@ -675,7 +888,8 @@ namespace BlockBuilder
             m_LastRoads = request.ExistingRoads;
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            m_Plan = LayoutEngine.Run(request);
+            m_Plan = m_Picked ? PlanBlocks(request) : LayoutEngine.Run(request);
+            m_PlanRings = m_Picked ? m_Regions.Select(x => x.Outline).ToList() : new List<List<Vec2>> { m_Plan.Boundary ?? new List<Vec2>() };
             if (options.PlacementMode == FillMode.FixedOnly && m_Fixed.Count == 0)
             {
                 Note("'only Shift+clicked buildings' is on and nothing is placed yet", "'Shift+클릭한 것만 짓기'가 켜져 있고 아직 놓은 건물이 없습니다");
@@ -723,6 +937,84 @@ namespace BlockBuilder
             return deps;
         }
 
+        /// <summary>Outlines drawn for the current plan (one per painted block, or the drawn area).</summary>
+        private List<List<Vec2>> m_PlanRings = new List<List<Vec2>>();
+
+        /// <summary>
+        /// Painted blocks are planned one by one (each ring is a curb outline, separated from the
+        /// others by roads) with the shared roads and buildings, and merged into one plan.
+        /// </summary>
+        private LayoutResult PlanBlocks(LayoutRequest shared)
+        {
+            var merged = new LayoutResult();
+            var counts = new Dictionary<string, int>();
+            foreach (var block in m_Regions)
+            {
+                var request = new LayoutRequest
+                {
+                    Boundary = block.Ring,
+                    ExistingRoads = shared.ExistingRoads,
+                    Obstacles = shared.Obstacles,
+                    Options = shared.Options,
+                    Items = RemainingItems(shared.Items, counts),
+                    Fixed = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center)).ToList(),
+                };
+
+                var result = LayoutEngine.Run(request);
+                int roadOffset = merged.Roads.Count;
+                foreach (var p in result.Placements)
+                {
+                    if (p.RoadIndex >= 0)
+                    {
+                        p.RoadIndex += roadOffset;
+                    }
+
+                    merged.Placements.Add(p);
+                    if (!p.IsFixed)
+                    {
+                        counts[p.ItemId] = (counts.TryGetValue(p.ItemId, out int n) ? n : 0) + 1;
+                    }
+                }
+
+                merged.Roads.AddRange(result.Roads);
+                foreach (var w in result.Warnings)
+                {
+                    if (!merged.Warnings.Contains(w))
+                    {
+                        merged.Warnings.Add(w);
+                    }
+                }
+            }
+
+            merged.Counts = counts;
+            return merged;
+        }
+
+        /// <summary>
+        /// Max counts apply to the whole selection, not per block: each block gets what is left, and
+        /// an item whose limit is used up is dropped (MaxCount 0 would mean unlimited).
+        /// </summary>
+        private static List<PaletteItem> RemainingItems(List<PaletteItem> items, Dictionary<string, int> used)
+        {
+            var left = new List<PaletteItem>();
+            foreach (var i in items)
+            {
+                if (i.MaxCount <= 0)
+                {
+                    left.Add(i);
+                    continue;
+                }
+
+                int remaining = i.MaxCount - (used.TryGetValue(i.Id, out int n) ? n : 0);
+                if (remaining > 0)
+                {
+                    left.Add(new PaletteItem { Id = i.Id, Width = i.Width, Depth = i.Depth, Weight = i.Weight, RequiresRoad = i.RequiresRoad, MaxCount = remaining });
+                }
+            }
+
+            return left;
+        }
+
         private void CollectRoads(LayoutRequest request)
         {
             m_RoadRefs.Clear();
@@ -738,7 +1030,9 @@ namespace BlockBuilder
         }
 
         /// <summary>Ground road segments in <paramref name="box"/>; Id indexes <paramref name="refs"/>.</summary>
-        private void CollectRoadSegments(Bounds2 box, List<RoadSegment> output, List<RoadRef> refs)
+        private static long Key(Entity e) => ((long)e.Index << 32) | (uint)e.Version;
+
+        private void CollectRoadSegments(Bounds2 box, List<RoadSegment> output, List<RoadRef> refs, List<GraphEdge> graph = null)
         {
             var tree = m_NetSearch.GetNetSearchTree(true, out var dependency);
             dependency.Complete();
@@ -782,7 +1076,15 @@ namespace BlockBuilder
                     ts.Add(t);
                 }
 
-                var keep = Polyline.Simplify(points, 0.5);
+                // Fine tolerance: lots on the outside of a bend are pushed past these points, and the
+                // game checks against the real curve.
+                var keep = Polyline.Simplify(points, 0.1);
+                if (graph != null)
+                {
+                    var ends = EntityManager.GetComponentData<Edge>(e);
+                    graph.Add(new GraphEdge { Id = Key(e), Start = Key(ends.m_Start), End = Key(ends.m_End), Width = width, Points = keep.Select(i => points[i]).ToList() });
+                }
+
                 for (int k = 0; k + 1 < keep.Count; k++)
                 {
                     output.Add(new RoadSegment
@@ -1014,16 +1316,43 @@ namespace BlockBuilder
                 buffer.DrawLine(c, c, 0f, OverlayRenderSystem.StyleFlags.Projected, new Line3.Segment(a, b), width, new float2(0f));
             }
 
-            for (int i = 0; i + 1 < m_Points.Count; i++)
+            void Ring(List<Vec2> ring, float y, Color c, float width)
+            {
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    var a = ring[i];
+                    var b = ring[(i + 1) % ring.Count];
+                    Line(new float3((float)a.X, y, (float)a.Y), new float3((float)b.X, y, (float)b.Y), c, width);
+                }
+            }
+
+            bool painting = Mod.Options != null && Mod.Options.Selection == AreaSelect.Paint;
+            if (painting)
+            {
+                // The painted outline (roads left out, curbs hugged) and the brush.
+                float y = m_HasCursor ? m_Cursor.y : (m_Points.Count > 0 ? m_Points[0].y : 0f);
+                foreach (var region in m_Regions)
+                {
+                    Ring(region.Outline, y, edge, 0.6f);
+                }
+
+                if (m_HasCursor && Mod.Options != null)
+                {
+                    float diameter = BrushRadius(Mod.Options) * 2f;
+                    buffer.DrawCircle(new Color(1f, 1f, 1f, 0.8f), new Color(1f, 1f, 1f, 0.08f), 0.4f, OverlayRenderSystem.StyleFlags.Projected, new float2(0f, 1f), m_Cursor, diameter);
+                }
+            }
+
+            for (int i = 0; !painting && i + 1 < m_Points.Count; i++)
             {
                 Line(m_Points[i], m_Points[i + 1], edge, 0.6f);
             }
 
-            if (m_State == State.Planned && m_Points.Count >= 3)
+            if (!painting && m_State == State.Planned && m_Points.Count >= 3)
             {
                 Line(m_Points[m_Points.Count - 1], m_Points[0], edge, 0.6f);
             }
-            else if (m_HasCursor && m_Points.Count > 0)
+            else if (!painting && m_HasCursor && m_Points.Count > 0)
             {
                 bool closes = m_Points.Count >= 3 && math.distance(m_Cursor.xz, m_Points[0].xz) < kCloseDistance;
                 Line(m_Points[m_Points.Count - 1], closes ? m_Points[0] : m_Snapped, closes ? closing : edge, 0.4f);
@@ -1052,21 +1381,18 @@ namespace BlockBuilder
                 buffer.DrawCircle(snapColor, new Color(1f, 0.85f, 0.3f, 0.25f), 0.3f, OverlayRenderSystem.StyleFlags.Projected, new float2(0f, 1f), m_Snapped, m_Snap.Kind == SnapKind.CurbCorner ? 3.2f : 2.4f);
             }
 
-            foreach (var p in m_Points)
+            for (int i = 0; !painting && i < m_Points.Count; i++)
             {
-                buffer.DrawCircle(Color.white, new Color(1f, 1f, 1f, 0.15f), 0.24f, OverlayRenderSystem.StyleFlags.Projected, new float2(0f, 1f), p, 2.4f);
+                buffer.DrawCircle(Color.white, new Color(1f, 1f, 1f, 0.15f), 0.24f, OverlayRenderSystem.StyleFlags.Projected, new float2(0f, 1f), m_Points[i], 2.4f);
             }
 
             if (m_State == State.Planned && m_Plan != null && m_Points.Count > 0)
             {
                 float y = m_Points[0].y;
-                // Boundary actually used after curb snapping.
-                var used = m_Plan.Boundary;
-                for (int i = 0; i < used.Count; i++)
+                // Boundary actually used after curb snapping (drawn areas; painted blocks are drawn above).
+                if (!painting && m_Plan.Boundary != null)
                 {
-                    var a = used[i];
-                    var b = used[(i + 1) % used.Count];
-                    Line(new float3((float)a.X, y, (float)a.Y), new float3((float)b.X, y, (float)b.Y), closing, 0.35f);
+                    Ring(m_Plan.Boundary, y, closing, 0.35f);
                 }
 
                 foreach (var placement in m_Plan.Placements)

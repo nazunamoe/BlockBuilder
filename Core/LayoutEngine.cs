@@ -12,16 +12,12 @@ namespace BlockBuilder.Core
     /// </summary>
     public static class LayoutEngine
     {
-        private sealed class Frontage
-        {
-            public Vec2 Start;
-            public Vec2 Dir;
-            /// <summary>Points away from the road, into the lots.</summary>
-            public Vec2 Normal;
-            public double Length;
-            public int RoadId;
-            public int RoadIndex = -1;
-        }
+        /// <summary>
+        /// How far a lot may poke past the area or into a neighbour and still count as touching.
+        /// Only float noise: a few centimetres into a road is an overlap error in the game, which
+        /// blocks the whole build.
+        /// </summary>
+        private const double kFit = 0.01;
 
         private sealed class Context
         {
@@ -89,16 +85,7 @@ namespace BlockBuilder.Core
                 }
             }
 
-            var fronts = new List<Frontage>();
-            foreach (var seg in request.ExistingRoads)
-            {
-                AddFrontages(ctx, fronts, seg.A, seg.B, seg.Width, seg.Id, -1);
-            }
-
-            for (int i = 0; i < result.Roads.Count; i++)
-            {
-                AddFrontages(ctx, fronts, result.Roads[i].A, result.Roads[i].B, result.Roads[i].Width, -2, i);
-            }
+            var fronts = Frontage.Build(request.ExistingRoads, result.Roads, ctx.Poly);
 
             if (roadItems.Count > 0)
             {
@@ -173,38 +160,6 @@ namespace BlockBuilder.Core
             return n < item.MaxCount;
         }
 
-        private static void AddFrontages(Context ctx, List<Frontage> fronts, Vec2 a, Vec2 b, double width, int roadId, int roadIndex)
-        {
-            Vec2 d = b - a;
-            double length = d.Length;
-            if (length < 1e-6)
-            {
-                return;
-            }
-
-            Vec2 dir = d / length;
-            foreach (int side in new[] { 1, -1 })
-            {
-                Vec2 n = dir.Perp * side;
-                Vec2 oa = a + n * (width / 2);
-                Vec2 ob = b + n * (width / 2);
-                // The road side often lies exactly on the site boundary; test inside-ness a hair
-                // toward the lots so a collinear edge is not lost to point-on-edge ambiguity.
-                Vec2 nudge = n * 0.05;
-                foreach (var (t0, t1) in Polygon.ClipSegment(ctx.Poly, oa + nudge, ob + nudge))
-                {
-                    double len = (t1 - t0) * length;
-                    if (len < 1)
-                    {
-                        continue;
-                    }
-
-                    // Walk in the direction that keeps the lot side consistent for both sides.
-                    fronts.Add(new Frontage { Start = Vec2.Lerp(oa, ob, t0), Dir = dir, Normal = n, Length = len, RoadId = roadId, RoadIndex = roadIndex });
-                }
-            }
-        }
-
         private static IEnumerable<PaletteItem> Order(Context ctx, List<PaletteItem> candidates)
         {
             double total = candidates.Sum(c => c.Weight);
@@ -259,7 +214,7 @@ namespace BlockBuilder.Core
                     continue;
                 }
 
-                if (box.Overlaps(o))
+                if (box.Overlaps(o, kFit))
                 {
                     return false;
                 }
@@ -271,6 +226,9 @@ namespace BlockBuilder.Core
         private static void FillFrontage(Context ctx, Frontage front, List<PaletteItem> items)
         {
             double t = 0;
+            // Right after a lot, search finely: on the inside of a bend the next lot only fits a
+            // little further on (the backs converge), and a full step would waste most of a lot.
+            double lastEnd = double.NegativeInfinity;
             while (true)
             {
                 var candidates = items.Where(i => Available(ctx, i) && i.Width <= front.Length - t + 1e-6).ToList();
@@ -290,9 +248,8 @@ namespace BlockBuilder.Core
                         continue;
                     }
 
-                    Vec2 center = front.Start + front.Dir * (t + item.Width / 2) + front.Normal * (item.Depth / 2);
-                    var box = new Obb(center, -front.Normal, item.Width, item.Depth);
-                    if (!Polygon.ContainsObb(ctx.Poly, box) || !Free(ctx, box))
+                    var box = front.LotAt(t, item.Width, item.Depth);
+                    if (!Polygon.ContainsObb(ctx.Poly, box, kFit) || !Free(ctx, box))
                     {
                         continue;
                     }
@@ -302,13 +259,14 @@ namespace BlockBuilder.Core
                     Count(ctx, item.Id);
                     // With an overlap allowance the next lot may start that far inside this one.
                     t += Math.Max(ctx.Options.Step / 2, item.Width - Math.Max(0, ctx.Options.OverlapSide) + Math.Max(0, ctx.Options.Gap));
+                    lastEnd = t;
                     placed = true;
                     break;
                 }
 
                 if (!placed)
                 {
-                    t += ctx.Options.Step;
+                    t += t - lastEnd < ctx.Options.Step ? Math.Min(1, ctx.Options.Step) : ctx.Options.Step;
                 }
             }
         }
@@ -349,7 +307,7 @@ namespace BlockBuilder.Core
                         Vec2 corner = u * pu + v * pv;
                         Vec2 center = corner + u * (item.Width / 2) + v * (item.Depth / 2);
                         var box = new Obb(center, v, item.Width, item.Depth);
-                        if (!Polygon.ContainsObb(ctx.Poly, box) || !Free(ctx, box))
+                        if (!Polygon.ContainsObb(ctx.Poly, box, kFit) || !Free(ctx, box))
                         {
                             continue;
                         }

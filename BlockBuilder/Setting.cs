@@ -20,6 +20,15 @@ namespace BlockBuilder
         RowOnNewRoad,
     }
 
+    /// <summary>How the area is chosen. Block is 0, the default.</summary>
+    public enum AreaSelect
+    {
+        /// <summary>Paint the area with a brush; roads are walls and the edge hugs the curbs (Placemaker-style paint).</summary>
+        Paint,
+        /// <summary>Click corners by hand.</summary>
+        Draw,
+    }
+
     /// <summary>How hard the fill packs lots. Normal is 0 so a missing saved value means Normal.</summary>
     public enum FillDensity
     {
@@ -162,6 +171,13 @@ namespace BlockBuilder
         /// <summary>Snap options (Game.Tools.Snap bits) turned off in the game's tool options panel. Default 0 = all on.</summary>
         [SettingsUIHidden]
         public int SnapOff { get; set; }
+
+        [SettingsUISection(kBuilderTab, kBuildGroup)]
+        public AreaSelect Selection { get; set; }
+
+        /// <summary>Brush radius in metres for painting; 0 means the default (16 m). Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int BrushRadius { get; set; }
 
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public FillDensity Density { get; set; }
