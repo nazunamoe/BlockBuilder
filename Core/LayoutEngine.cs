@@ -111,6 +111,14 @@ namespace BlockBuilder.Core
         }
 
         /// <summary>
+        /// Box for a lot the user places or drags to <paramref name="point"/>: against the nearest
+        /// curb within <paramref name="maxDistance"/>, facing the road, fitted to curves the same way
+        /// as the fill. False when no curb is that close.
+        /// </summary>
+        public static bool TrySnapLot(IReadOnlyList<RoadSegment> roads, Vec2 point, double width, double depth, out Obb box, double maxDistance = 48) =>
+            Frontage.TrySnapLot(roads, point, width, depth, maxDistance, out box);
+
+        /// <summary>
         /// Box for an item the user drops at <paramref name="point"/> (designate mode): flush against
         /// the nearest road side within <paramref name="maxDistance"/> and facing it, centred along
         /// the road at the cursor. Without a nearby road it is centred on the point facing +Y.

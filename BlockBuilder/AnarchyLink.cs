@@ -79,7 +79,14 @@ namespace BlockBuilder
             }
         }
 
-        /// <summary>True when Anarchy is installed and switched on.</summary>
+        private static Func<bool> s_State;
+        private static int s_StateFrame = -1;
+        private static bool s_StateValue;
+
+        /// <summary>
+        /// True when Anarchy is installed and switched on. Read through a delegate at most once per
+        /// frame (the plan key and the panel ask several times a frame).
+        /// </summary>
         public static bool Enabled
         {
             get
@@ -89,14 +96,24 @@ namespace BlockBuilder
                     return false;
                 }
 
+                int frame = UnityEngine.Time.frameCount;
+                if (frame == s_StateFrame)
+                {
+                    return s_StateValue;
+                }
+
+                s_StateFrame = frame;
                 try
                 {
-                    return (bool)s_ToggleState.Invoke(null, null);
+                    s_State ??= (Func<bool>)Delegate.CreateDelegate(typeof(Func<bool>), s_ToggleState);
+                    s_StateValue = s_State();
                 }
                 catch
                 {
-                    return false;
+                    s_StateValue = false;
                 }
+
+                return s_StateValue;
             }
         }
     }

@@ -68,6 +68,8 @@ namespace BlockBuilder.Core
 
         /// <summary>Grid step for interior (no-road) items; independent of the frontage search step.</summary>
         public double InteriorStep = 8;
+
+        public LayoutOptions Clone() => (LayoutOptions)MemberwiseClone();
     }
 
     public sealed class LayoutRequest

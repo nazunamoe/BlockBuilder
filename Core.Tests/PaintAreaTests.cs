@@ -187,6 +187,82 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void GapFurtherThanSnap_IsLeftAlone()
+        {
+            var roads = Straight(new Vec2(-500, 0), new Vec2(600, 0));
+            var paint = new PaintArea(roads);
+            paint.BeginStroke(new Vec2(50, 40));
+            // Brush edge at y = 17: 9 m short of the curb, beyond the 6 m snap.
+            paint.Stroke(new Vec2(0, 40), new Vec2(120, 40), 23, erase: false);
+            Assert.Equal(0, paint.EndStroke());
+            Assert.False(paint.IsPainted(new Vec2(60, 10)));
+        }
+
+        [Fact]
+        public void GapClosing_OnlyMovesTowardTheRoad()
+        {
+            var roads = Straight(new Vec2(-500, 0), new Vec2(600, 0));
+            var paint = new PaintArea(roads);
+            paint.BeginStroke(new Vec2(50, 30));
+            paint.Stroke(new Vec2(40, 30), new Vec2(60, 30), 18, erase: false); // reaches y = 12
+            paint.EndStroke();
+            // Closed straight down to the curb, not spread sideways along the road.
+            Assert.True(paint.IsPainted(new Vec2(50, 9)));
+            Assert.False(paint.IsPainted(new Vec2(80, 9)), "no spread along the road");
+            Assert.False(paint.IsPainted(new Vec2(20, 9)), "no spread along the road");
+        }
+
+        [Fact]
+        public void ErasedBandByTheCurb_StaysErasedAfterAStrokeElsewhere()
+        {
+            var roads = Straight(new Vec2(-500, 0), new Vec2(600, 0));
+            var paint = new PaintArea(roads);
+            paint.BeginStroke(new Vec2(50, 25));
+            paint.Stroke(new Vec2(0, 25), new Vec2(120, 25), 20, erase: false);
+            paint.EndStroke();
+            Assert.True(paint.IsPainted(new Vec2(60, 9)));
+
+            // Erase a band along the curb, then paint far from the road.
+            paint.Stroke(new Vec2(0, 10), new Vec2(120, 10), 3, erase: true);
+            Assert.False(paint.IsPainted(new Vec2(60, 9)));
+            paint.BeginStroke(new Vec2(60, 40));
+            paint.Stamp(new Vec2(60, 40), 6, erase: false);
+            paint.EndStroke();
+            Assert.False(paint.IsPainted(new Vec2(60, 9)), "the erased band is not refilled");
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void SnapLot_OnACurve_StaysClearOfTheRoad(bool outside)
+        {
+            var roads = CurvedFrontageTests.Arc(60, 16, 1, 0, 180);
+            double r = outside ? 60 + 8 + 10 : 60 - 8 - 10;
+            foreach (double deg in new[] { 30.0, 90.0, 140.0 })
+            {
+                var at = new Vec2(r * Math.Cos(deg * Math.PI / 180), r * Math.Sin(deg * Math.PI / 180));
+                Assert.True(LayoutEngine.TrySnapLot(roads, at, 24, 16, out var box));
+                foreach (var s in roads)
+                {
+                    Assert.False(box.Overlaps(Obb.FromSegment(s.A, s.B, s.Width), 0.001), $"lot snapped at {deg} deg overlaps the road");
+                }
+
+                // Faces the road and its front is close to the curb.
+                double front = outside ? box.Center.Length - box.Depth / 2 : box.Center.Length + box.Depth / 2;
+                Assert.InRange(Math.Abs(front - (outside ? 68 : 52)), 0, 2.5);
+            }
+        }
+
+        [Fact]
+        public void TinyBrushClick_StillMakesAVisibleRegion()
+        {
+            var paint = new PaintArea(new List<RoadSegment>());
+            paint.BeginStroke(new Vec2(50, 50));
+            paint.Stamp(new Vec2(50, 50), 4, erase: false); // the smallest brush, one click
+            Assert.Single(paint.Regions());
+        }
+
+        [Fact]
         public void FreeEdges_KeepTheBrushSize()
         {
             var roads = Straight(new Vec2(-500, 0), new Vec2(600, 0));

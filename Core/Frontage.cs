@@ -141,6 +141,56 @@ namespace BlockBuilder.Core
             return t0 <= t1;
         }
 
+        /// <summary>
+        /// Lot of the given size placed against the curb nearest to <paramref name="point"/> (within
+        /// <paramref name="maxDistance"/> of it), centred along the curb at the point and facing the
+        /// road. Uses the same curb walk as the fill, so it also fits on curved roads.
+        /// </summary>
+        public static bool TrySnapLot(IReadOnlyList<RoadSegment> roads, Vec2 point, double width, double depth, double maxDistance, out Obb box)
+        {
+            box = default;
+            double reach = maxDistance + width + depth + 50;
+            var square = new List<Vec2>
+            {
+                point + new Vec2(-reach, -reach),
+                point + new Vec2(reach, -reach),
+                point + new Vec2(reach, reach),
+                point + new Vec2(-reach, reach),
+            };
+            var near = roads.Where(r => Segment.Distance(r.A, r.B, point, out _) <= reach).ToList();
+            Frontage best = null;
+            double bestDistance = double.MaxValue;
+            double bestS = 0;
+            foreach (var f in Build(near, new List<PlannedRoad>(), square))
+            {
+                for (int k = 0; k + 1 < f.Points.Count; k++)
+                {
+                    Vec2 a = f.Points[k];
+                    Vec2 b = f.Points[k + 1];
+                    double d = Segment.Distance(a, b, point, out double t);
+                    Vec2 n = (b - a).Normalized.Perp * f.Side;
+                    // The point must be on the lots' side of this curb (or just on it).
+                    if (d >= bestDistance || Vec2.Dot(point - Vec2.Lerp(a, b, t), n) < -1)
+                    {
+                        continue;
+                    }
+
+                    bestDistance = d;
+                    best = f;
+                    bestS = f.Cum[k] + t * Vec2.Distance(a, b);
+                }
+            }
+
+            if (best == null || bestDistance > maxDistance || best.Length < width)
+            {
+                return false;
+            }
+
+            double s0 = Math.Max(0, Math.Min(best.Length - width, bestS - width / 2));
+            box = best.LotAt(s0, width, depth);
+            return true;
+        }
+
         /// <summary>Frontages along both sides of every road, clipped to the area.</summary>
         public static List<Frontage> Build(IReadOnlyList<RoadSegment> existing, IReadOnlyList<PlannedRoad> generated, List<Vec2> poly)
         {

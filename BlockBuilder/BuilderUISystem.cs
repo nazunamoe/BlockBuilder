@@ -25,6 +25,7 @@ namespace BlockBuilder
         private CatalogSystem m_Catalog;
         private ProxyAction m_ToggleAction;
         private string m_ListsKey = string.Empty;
+        private bool m_WasActive = true;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -97,7 +98,15 @@ namespace BlockBuilder
                 }
             }));
             AddBinding(new TriggerBinding(kGroup, "build", () => m_Tool.RequestApply()));
-            AddBinding(new TriggerBinding<int>(kGroup, "setBrush", n => Edit(o => o.BrushRadius = System.Math.Max(4, System.Math.Min(80, n)))));
+            // Brush size does not change the layout: save it without bumping the plan revision.
+            AddBinding(new TriggerBinding<int>(kGroup, "setBrush", n =>
+            {
+                if (Mod.Options != null)
+                {
+                    Mod.Options.BrushRadius = System.Math.Max(4, System.Math.Min(80, n));
+                    Mod.Options.ApplyAndSave();
+                }
+            }));
             AddBinding(new TriggerBinding<int>(kGroup, "setDensity", n => Edit(o =>
             {
                 o.Density = n >= 0 && n <= 3 ? (FillDensity)n : FillDensity.Normal;
@@ -454,7 +463,15 @@ namespace BlockBuilder
                 m_Lists.Update(BuildLists(options));
             }
 
-            m_State.Update(BuildState(options));
+            // The panel only shows while the builder is active; the toolbar button just needs to see it
+            // switch off once. Skip building the state every frame while the builder is off.
+            bool active = m_Tool.IsActive;
+            if (active || m_WasActive)
+            {
+                m_State.Update(BuildState(options));
+            }
+
+            m_WasActive = active;
         }
 
         private string BuildState(Setting o)

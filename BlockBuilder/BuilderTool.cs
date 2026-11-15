@@ -82,6 +82,7 @@ namespace BlockBuilder
         private readonly List<RandomSeed> m_Seeds = new List<RandomSeed>();
         private readonly List<Placement> m_Fixed = new List<Placement>();
         private List<RoadSegment> m_LastRoads = new List<RoadSegment>();
+        private List<Obb> m_LastObstacles = new List<Obb>();
         private State m_State;
         private LayoutResult m_Plan;
         private string m_PlanKey = string.Empty;
@@ -156,6 +157,12 @@ namespace BlockBuilder
             applyAction.shouldBeEnabled = false;
             secondaryApplyAction.shouldBeEnabled = false;
             m_PendingClick = false;
+            m_Moving = null; // a drag interrupted by the menu is cancelled, not dropped later
+            if (m_StrokeActive)
+            {
+                FinishStroke();
+            }
+
             m_PlanKey = string.Empty;
             m_Submitted = 0;
             m_AllDefinitions.CompleteDependency();
@@ -446,6 +453,9 @@ namespace BlockBuilder
         private bool m_ApplyRequested;
         private bool m_StrokeActive;
         private bool m_StrokeErase;
+        private int m_StrokeStartVersion;
+        /// <summary>Outlines shown while a stroke is in progress (no engine rings yet).</summary>
+        private List<PaintRegion> m_LiveRegions;
         private int m_StrokeFrames;
         /// <summary>The current area is painted (its rings already reach past the curbs).</summary>
         private bool m_Picked;
@@ -508,6 +518,7 @@ namespace BlockBuilder
                 m_StrokeErase = mouse.rightButton.wasPressedThisFrame || ctrl;
                 m_StrokeActive = true;
                 m_StrokeFrames = 0;
+                m_StrokeStartVersion = m_Paint.Version;
                 m_LastPaint = m_Cursor.xz;
                 if (!m_StrokeErase && !m_Paint.BeginStroke(new Vec2(m_Cursor.x, m_Cursor.z)))
                 {
@@ -527,7 +538,7 @@ namespace BlockBuilder
             var to = new Vec2(m_Cursor.x, m_Cursor.z);
             if (m_Paint.Stroke(from, to, r, m_StrokeErase) && ++m_StrokeFrames % 4 == 0)
             {
-                m_Regions = m_Paint.Regions(); // live outline while painting (planned at the end)
+                m_LiveRegions = m_Paint.Regions(rings: false); // outlines only while painting; planned at the end
             }
 
             m_LastPaint = m_Cursor.xz;
@@ -536,18 +547,26 @@ namespace BlockBuilder
         /// <summary>Ends a stroke once no mouse button is held (also when released over the panel).</summary>
         private void FinishStrokeIfReleased(UnityEngine.InputSystem.Mouse mouse)
         {
-            if (!m_StrokeActive || (mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed)))
+            if (m_StrokeActive && (mouse == null || (!mouse.leftButton.isPressed && !mouse.rightButton.isPressed)))
             {
-                return;
+                FinishStroke();
             }
+        }
 
+        private void FinishStroke()
+        {
             m_StrokeActive = false;
+            m_LiveRegions = null;
             if (!m_StrokeErase)
             {
                 m_Paint.EndStroke();
             }
 
-            SyncPaint();
+            // A click that changed nothing must not re-plan (that would also release moved buildings).
+            if (m_Paint.Version != m_StrokeStartVersion)
+            {
+                SyncPaint();
+            }
         }
 
         /// <summary>After the painted area changes: regions, bounding points, state and a fresh plan.</summary>
@@ -677,27 +696,35 @@ namespace BlockBuilder
         }
 
         /// <summary>Where a dragged lot goes: against the nearest road and facing it, or at the cursor.</summary>
-        private Obb MoveTarget(Placement lot, Vec2 at)
+        private Obb MoveTarget(Placement lot, Vec2 at) => SnapLot(lot.ItemId, lot.Box.Width, lot.Box.Depth, at, lot.Box.Forward);
+
+        private bool MoveFits(Placement lot, Obb box) => LotFits(box, lot);
+
+        /// <summary>
+        /// A lot placed by hand (Shift+click or drag): against the nearest curb and facing the road,
+        /// fitted to curves like the fill; without a road nearby (or for items that need none) it
+        /// sits at the point facing <paramref name="forward"/>.
+        /// </summary>
+        private Obb SnapLot(string itemId, double width, double depth, Vec2 at, Vec2 forward)
         {
-            var entry = m_Catalog.FindBuilding(lot.ItemId);
-            if (entry == null || entry.RequiresRoad)
+            var entry = m_Catalog.FindBuilding(itemId);
+            if ((entry == null || entry.RequiresRoad) && LayoutEngine.TrySnapLot(m_LastRoads.Concat(PlannedRoadSegments()).ToList(), at, width, depth, out var box))
             {
-                var roads = m_LastRoads.Concat(PlannedRoadSegments()).ToList();
-                if (roads.Any(r => Core.Segment.Distance(r.A, r.B, at, out _) - r.Width / 2 <= 48))
-                {
-                    return LayoutEngine.SnapToFrontage(roads, at, lot.Box.Width, lot.Box.Depth);
-                }
+                return box;
             }
 
-            return new Obb(at, lot.Box.Forward, lot.Box.Width, lot.Box.Depth);
+            return new Obb(at, forward, width, depth);
         }
 
-        /// <summary>A dropped lot may not overlap another lot of the plan or a road.</summary>
-        private bool MoveFits(Placement lot, Obb box)
+        /// <summary>
+        /// A hand-placed lot may not overlap another lot of the plan, a road or an existing building:
+        /// one overlap error in the game blocks the whole build.
+        /// </summary>
+        private bool LotFits(Obb box, Placement ignore)
         {
-            foreach (var other in m_Plan.Placements)
+            foreach (var other in m_Plan?.Placements ?? Enumerable.Empty<Placement>())
             {
-                if (!ReferenceEquals(other, lot) && box.Overlaps(other.Box, 0.01))
+                if (!ReferenceEquals(other, ignore) && box.Overlaps(other.Box, 0.01))
                 {
                     return false;
                 }
@@ -706,6 +733,14 @@ namespace BlockBuilder
             foreach (var r in m_LastRoads.Concat(PlannedRoadSegments()))
             {
                 if (box.Overlaps(Obb.FromSegment(r.A, r.B, r.Width), 0.01))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var o in m_LastObstacles)
+            {
+                if (box.Overlaps(o, 0.01))
                 {
                     return false;
                 }
@@ -974,7 +1009,13 @@ namespace BlockBuilder
                 return;
             }
 
-            var box = LayoutEngine.SnapToFrontage(entry.RequiresRoad ? m_LastRoads.Concat(PlannedRoadSegments()) : Enumerable.Empty<RoadSegment>(), new Vec2(m_Cursor.x, m_Cursor.z), entry.LotWidth * 8, entry.LotDepth * 8);
+            var box = SnapLot(entry.Name, entry.LotWidth * 8, entry.LotDepth * 8, new Vec2(m_Cursor.x, m_Cursor.z), new Vec2(0, 1));
+            if (!LotFits(box, null))
+            {
+                Note("cannot place it there: it would overlap a building or a road", "그 자리에는 놓을 수 없습니다 (건물이나 도로와 겹침)");
+                return;
+            }
+
             m_Fixed.Add(new Placement { ItemId = entry.Name, Box = box });
             m_PlanKey = string.Empty;
             Note($"designated {entry.Name} at {box.Center} ({m_Fixed.Count} total)", $"{entry.Name} 지정 (총 {m_Fixed.Count}개)");
@@ -1046,6 +1087,7 @@ namespace BlockBuilder
             CollectRoads(request);
             CollectBuildings(request);
             m_LastRoads = request.ExistingRoads;
+            m_LastObstacles = request.Obstacles;
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
             m_Plan = m_Picked ? PlanBlocks(request) : LayoutEngine.Run(request);
@@ -1115,7 +1157,8 @@ namespace BlockBuilder
                     Boundary = block.Ring,
                     ExistingRoads = shared.ExistingRoads,
                     Obstacles = shared.Obstacles,
-                    Options = shared.Options,
+                    // Each region its own seed, so neighbouring regions do not repeat the same sequence.
+                    Options = RegionOptions(shared.Options, m_Regions.IndexOf(block)),
                     Items = RemainingItems(shared.Items, counts),
                     Fixed = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center) || (block == m_Regions[0] && !m_Regions.Any(r => Polygon.Contains(r.Ring, f.Box.Center)))).ToList(),
                 };
@@ -1148,6 +1191,13 @@ namespace BlockBuilder
 
             merged.Counts = counts;
             return merged;
+        }
+
+        private static LayoutOptions RegionOptions(LayoutOptions shared, int index)
+        {
+            var options = shared.Clone();
+            options.Seed = shared.Seed + index * 7919;
+            return options;
         }
 
         /// <summary>
@@ -1491,7 +1541,7 @@ namespace BlockBuilder
             {
                 // The painted outline (roads left out, curbs hugged) and the brush.
                 float y = m_HasCursor ? m_Cursor.y : (m_Points.Count > 0 ? m_Points[0].y : 0f);
-                foreach (var region in m_Regions)
+                foreach (var region in m_LiveRegions ?? m_Regions)
                 {
                     Ring(region.Outline, y, edge, 0.6f);
                 }

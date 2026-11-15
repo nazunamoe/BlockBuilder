@@ -32,12 +32,17 @@ namespace BlockBuilder.Core
         private readonly Dictionary<long, List<int>> m_Buckets = new Dictionary<long, List<int>>();
         private readonly Dictionary<long, bool> m_RoadCell = new Dictionary<long, bool>();
         private readonly HashSet<long> m_Painted = new HashSet<long>();
+        /// <summary>Cells added by the current paint stroke (the only seeds for closing gaps to curbs).</summary>
+        private readonly HashSet<long> m_StrokeCells = new HashSet<long>();
         private HashSet<long> m_Allowed;
         private const double kBucket = 32;
 
         public double Cell { get; }
 
         public int Count => m_Painted.Count;
+
+        /// <summary>Bumped on every change of the painted cells.</summary>
+        public int Version { get; private set; }
 
         /// <summary>Painted cells as (column, row); used to carry the paint over when the roads are rebuilt.</summary>
         public IEnumerable<(int I, int J)> Cells => m_Painted.Select(Unkey).ToList();
@@ -123,6 +128,7 @@ namespace BlockBuilder.Core
         {
             var (si, sj) = CellAt(at);
             m_Allowed = new HashSet<long>();
+            m_StrokeCells.Clear();
             if (IsRoad(si, sj))
             {
                 return false;
@@ -194,11 +200,17 @@ namespace BlockBuilder.Core
                     {
                         changed |= m_Painted.Remove(key);
                     }
-                    else if (m_Allowed != null && m_Allowed.Contains(key))
+                    else if (m_Allowed != null && m_Allowed.Contains(key) && m_Painted.Add(key))
                     {
-                        changed |= m_Painted.Add(key);
+                        m_StrokeCells.Add(key);
+                        changed = true;
                     }
                 }
+            }
+
+            if (changed)
+            {
+                Version++;
             }
 
             return changed;
@@ -212,16 +224,21 @@ namespace BlockBuilder.Core
         /// </summary>
         public int EndStroke(double snap = 6)
         {
-            int depth = (int)Math.Ceiling(snap / Cell);
-            var added = new List<long>();
-            var frontier = new List<long>(m_Painted);
-            var reached = new HashSet<long>(m_Painted);
-            for (int step = 0; step < depth; step++)
+            // Seeds: cells this stroke painted that are already within snap of a curb. From there the
+            // gap is closed by stepping only toward the road (curb distance strictly decreasing), so
+            // nothing spreads along the road or away from it, and paint erased earlier near a curb
+            // is not brought back by a stroke elsewhere.
+            var frontier = m_StrokeCells.Where(k => { var (i, j) = Unkey(k); return CurbDistance(Centre(i, j)) <= snap; }).ToList();
+            var reached = new HashSet<long>(frontier);
+            int added = 0;
+            int depth = (int)Math.Ceiling(snap / Cell) + 1;
+            for (int step = 0; step < depth && frontier.Count > 0; step++)
             {
                 var next = new List<long>();
                 foreach (long k in frontier)
                 {
                     var (i, j) = Unkey(k);
+                    double here = CurbDistance(Centre(i, j));
                     foreach (var (di, dj) in Neighbours)
                     {
                         int ni = i + di;
@@ -232,11 +249,17 @@ namespace BlockBuilder.Core
                             continue;
                         }
 
+                        double there = CurbDistance(Centre(ni, nj));
+                        if (there >= here - 1e-6 || there > snap)
+                        {
+                            continue;
+                        }
+
                         reached.Add(n);
                         next.Add(n);
-                        if (CurbDistance(Centre(ni, nj)) <= snap)
+                        if (m_Painted.Add(n))
                         {
-                            added.Add(n);
+                            added++;
                         }
                     }
                 }
@@ -244,15 +267,15 @@ namespace BlockBuilder.Core
                 frontier = next;
             }
 
-            foreach (long k in added)
+            if (added > 0)
             {
-                m_Painted.Add(k);
+                Version++;
             }
 
+            m_StrokeCells.Clear();
             m_Allowed = null;
-            return added.Count;
+            return added;
         }
-
         /// <summary>Distance from p to the nearest curb (0 on a road surface), or +inf with no road nearby.</summary>
         private double CurbDistance(Vec2 p) => NearestRoad(p, out _, out _, out double d) ? Math.Max(0, d) : double.PositiveInfinity;
 
@@ -315,12 +338,27 @@ namespace BlockBuilder.Core
         }
 
         /// <summary>For tests: paint one cell regardless of roads and strokes.</summary>
-        public void PaintCell(int i, int j) => m_Painted.Add(Key(i, j));
+        public void PaintCell(int i, int j)
+        {
+            if (m_Painted.Add(Key(i, j)))
+            {
+                Version++;
+            }
+        }
 
-        public void Clear() => m_Painted.Clear();
+        public void Clear()
+        {
+            if (m_Painted.Count > 0)
+            {
+                m_Painted.Clear();
+                Version++;
+            }
+
+            m_StrokeCells.Clear();
+        }
 
         /// <summary>Connected painted regions with their display outline and engine ring.</summary>
-        public List<PaintRegion> Regions(double minArea = 64)
+        public List<PaintRegion> Regions(double minArea = 16, bool rings = true)
         {
             var regions = new List<PaintRegion>();
             var seen = new HashSet<long>();
@@ -357,6 +395,12 @@ namespace BlockBuilder.Core
                 var outline = OuterRing(cells);
                 if (outline.Count < 4)
                 {
+                    continue;
+                }
+
+                if (!rings)
+                {
+                    regions.Add(new PaintRegion { Outline = SnapToCurb(Simplify(outline, Cell * 0.45)), Cells = cells.Count, Area = cells.Count * Cell * Cell });
                     continue;
                 }
 
