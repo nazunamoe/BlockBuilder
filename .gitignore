@@ -1,0 +1,18 @@
+# .NET build output
+bin/
+obj/
+*.user
+.vs/
+
+# Unity / mod post-processor scratch
+BlockBuilder/Library/
+
+# UI (React) dependencies and build output
+UI/node_modules/
+UI/build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
