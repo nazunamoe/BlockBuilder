@@ -22,6 +22,7 @@ export interface BuilderState {
     density: number;
     overlapSide: number;
     overlapBack: number;
+    customGap: number;
     anarchyInstalled: boolean;
     anarchyOn: boolean;
     generateRoads: boolean;
@@ -78,7 +79,7 @@ export interface Search {
 }
 
 /** FillDensity values on the C# side. */
-export const DENSITY = { normal: 0, relaxed: 1, dense: 2, max: 3 };
+export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
@@ -114,6 +115,7 @@ const emptyState: BuilderState = {
     density: 0,
     overlapSide: 0,
     overlapBack: 0,
+    customGap: 0,
     anarchyInstalled: false,
     anarchyOn: false,
     generateRoads: false,
@@ -156,6 +158,7 @@ export const actions = {
     toggleSnap: (bit: number) => trigger(GROUP, "toggleSnap", bit),
     setOverlapSide: (n: number) => trigger(GROUP, "setOverlapSide", n),
     setOverlapBack: (n: number) => trigger(GROUP, "setOverlapBack", n),
+    setCustomGap: (n: number) => trigger(GROUP, "setCustomGap", n),
     /** Anarchy's own UI trigger (group "Anarchy"); only call when Anarchy is installed. */
     toggleAnarchy: () => trigger("Anarchy", "AnarchyToggled"),
     setSelection: (n: number) => trigger(GROUP, "setSelection", n),

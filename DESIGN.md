@@ -157,7 +157,7 @@
   - 결과 JSON `blockBuilder.search`는 처음 80개만 담고, 현재 리스트에 있는지 표시한다.
   - 빌더가 켜져 있을 때 조건이 바뀌면만 다시 계산한다.
 - 이름·검색 입력: 게임 `TextInput` 모듈을 쓴다. 포커스가 있는 동안 게임 단축키를 막아 준다. 렌더 중 오류가 나면 일반 `input`으로 대체한다(ErrorBoundary).
-- 채움 강도 `FillDensity`(Normal=0이 기본):
+- 채움 강도 `FillDensity`(Normal=0이 기본). 2026-11-15에 Max를 **Custom(사용자 지정)**으로 바꿨다(사용자 피드백: "최대"라는 이름으로는 직접 정하는 칸인지 알 수 없음). Custom은 간격 `CustomGap`, 좌우·상하 겹침을 0.5m 단위로 직접 정하고, 찾기 간격은 촘촘과 같은 2m이다. 겹침은 Anarchy가 켜져 있어야 적용되고, 간격은 Anarchy 없이도 적용된다. 겹침 값은 float으로 저장한다. 아래 줄은 바꾸기 전 기록이다.
   - 여유는 Gap 4m, 보통은 Step 8m, 촘촘은 Step 2m이다.
   - 최대는 촘촘에 OverlapSide/OverlapBack을 더하며, Anarchy가 켜져 있을 때만 적용된다. 처음 최대를 고를 때 겹침이 0/0이면 2m/4m로 시작한다.
   - 내부 채우기 격자는 `InteriorStep`(8m)을 따로 써서 촘촘이어도 느려지지 않는다.

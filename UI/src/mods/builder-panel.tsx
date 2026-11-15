@@ -371,8 +371,8 @@ function Group({ title, extra, children }: { title: string; extra?: React.ReactN
 }
 
 function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
-    const isMax = state.density === DENSITY.max;
-    const describe = ["densityNormal", "densityRelaxed", "densityDense", "densityMax"][state.density] ?? "densityNormal";
+    const isCustom = state.density === DENSITY.custom;
+    const describe = ["densityNormal", "densityRelaxed", "densityDense", "densityCustom"][state.density] ?? "densityNormal";
     return (
         <>
             <Group
@@ -392,14 +392,15 @@ function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
                         { value: DENSITY.relaxed, label: t("relaxed") },
                         { value: DENSITY.normal, label: t("normal") },
                         { value: DENSITY.dense, label: t("dense") },
-                        { value: DENSITY.max, label: t("max") },
+                        { value: DENSITY.custom, label: t("custom") },
                     ]}
                 />
                 <div className={styles.note}>{t(describe)}</div>
-                {isMax && (
+                {isCustom && (
                     <div className={styles.indent}>
-                        <Stepper label={t("overlapSide")} value={state.overlapSide} unit="m" step={1} onChange={actions.setOverlapSide} disabled={!state.anarchyOn} />
-                        <Stepper label={t("overlapBack")} value={state.overlapBack} unit="m" step={1} onChange={actions.setOverlapBack} disabled={!state.anarchyOn} />
+                        <Stepper label={t("customGap")} value={state.customGap} unit="m" step={0.5} onChange={actions.setCustomGap} />
+                        <Stepper label={t("overlapSide")} value={state.overlapSide} unit="m" step={0.5} onChange={actions.setOverlapSide} disabled={!state.anarchyOn} />
+                        <Stepper label={t("overlapBack")} value={state.overlapBack} unit="m" step={0.5} onChange={actions.setOverlapBack} disabled={!state.anarchyOn} />
                         <div className={state.anarchyOn ? styles.note : styles.warning}>
                             {t(!state.anarchyInstalled ? "overlapNoAnarchy" : state.anarchyOn ? "overlapActive" : "overlapAnarchyOff")}
                         </div>

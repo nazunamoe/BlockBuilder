@@ -127,15 +127,15 @@ namespace BlockBuilder
         internal static double EffectiveBack(Setting options) => MaxActive(options) ? options.OverlapBack : 0;
 
         /// <summary>Max density packs with overlaps, which the game only allows while Anarchy is on.</summary>
-        private static bool MaxActive(Setting options) => options.Density == FillDensity.Max && AnarchyLink.Enabled;
+        private static bool MaxActive(Setting options) => options.Density == FillDensity.Custom && AnarchyLink.Enabled;
 
-        private static bool WantsOverlap(Setting options) => options.Density == FillDensity.Max;
+        private static bool WantsOverlap(Setting options) => options.Density == FillDensity.Custom && (options.OverlapSide > 0 || options.OverlapBack > 0);
 
         /// <summary>Gap between lots along a road for the density level.</summary>
-        internal static double DensityGap(Setting options) => options.Density == FillDensity.Relaxed ? 4 : 0;
+        internal static double DensityGap(Setting options) => options.Density == FillDensity.Relaxed ? 4 : options.Density == FillDensity.Custom ? options.CustomGap : 0;
 
         /// <summary>Search step along the road: finer steps find lots in odd gaps.</summary>
-        internal static double DensityStep(Setting options) => options.Density == FillDensity.Dense || options.Density == FillDensity.Max ? 2 : 8;
+        internal static double DensityStep(Setting options) => options.Density == FillDensity.Dense || options.Density == FillDensity.Custom ? 2 : 8;
 
         protected override void OnStartRunning()
         {
@@ -902,8 +902,8 @@ namespace BlockBuilder
             if (WantsOverlap(options) && !AnarchyLink.Enabled && m_Plan.Placements.Count > 0)
             {
                 Note(
-                    AnarchyLink.Installed ? "max density needs Anarchy switched on; filled densely without overlaps" : "max density needs the Anarchy mod; filled densely without overlaps",
-                    AnarchyLink.Installed ? "최대 채움은 Anarchy를 켜야 적용됩니다. 지금은 겹침 없이 촘촘하게 채웠습니다" : "최대 채움은 Anarchy 모드가 필요합니다. 지금은 겹침 없이 촘촘하게 채웠습니다");
+                    AnarchyLink.Installed ? "custom overlaps need Anarchy switched on; filled without overlaps" : "custom overlaps need the Anarchy mod; filled without overlaps",
+                    AnarchyLink.Installed ? "사용자 지정 겹침은 Anarchy를 켜야 적용됩니다. 지금은 겹침 없이 채웠습니다" : "사용자 지정 겹침은 Anarchy 모드가 필요합니다. 지금은 겹침 없이 채웠습니다");
             }
 
             Mod.log.Info($"builder: plan density={options.Density} overlap={EffectiveSide(options)}/{EffectiveBack(options)} anarchy={AnarchyLink.Enabled} mode={options.PlacementMode} scope={options.Scope} checked={options.Checked.Count} palette='{palette.Name}' items={items.Count} existingRoadSegments={request.ExistingRoads.Count} existingBuildings={request.Obstacles.Count} -> buildings={m_Plan.Placements.Count} streets={m_Plan.Roads.Count} in {watch.ElapsedMilliseconds} ms");

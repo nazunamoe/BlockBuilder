@@ -35,8 +35,8 @@ namespace BlockBuilder
         Normal,
         Relaxed,
         Dense,
-        /// <summary>Dense plus the overlap allowances; needs Anarchy on.</summary>
-        Max,
+        /// <summary>User-set gap and overlaps (overlaps need Anarchy on); searches like Dense.</summary>
+        Custom,
     }
 
     /// <summary>Which list entries the fill uses.</summary>
@@ -184,11 +184,15 @@ namespace BlockBuilder
 
         /// <summary>Metres lots may overlap at each side (left/right); applied only at Max density with Anarchy on. Set in the panel.</summary>
         [SettingsUIHidden]
-        public int OverlapSide { get; set; }
+        public float OverlapSide { get; set; }
+
+        /// <summary>Custom density: empty metres left between lots along a road.</summary>
+        [SettingsUIHidden]
+        public float CustomGap { get; set; }
 
         /// <summary>Metres lots may overlap at the back; applied only at Max density with Anarchy on. Set in the panel.</summary>
         [SettingsUIHidden]
-        public int OverlapBack { get; set; }
+        public float OverlapBack { get; set; }
 
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public bool GenerateRoads { get; set; }

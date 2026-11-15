@@ -80,8 +80,10 @@ namespace BlockBuilder
                     o.SnapOff ^= bit;
                 }
             })));
-            AddBinding(new TriggerBinding<int>(kGroup, "setOverlapSide", n => EditIfAnarchy(o => o.OverlapSide = System.Math.Max(0, System.Math.Min(8, n)))));
-            AddBinding(new TriggerBinding<int>(kGroup, "setOverlapBack", n => EditIfAnarchy(o => o.OverlapBack = System.Math.Max(0, System.Math.Min(16, n)))));
+            // Custom density values, in 0.5 m steps.
+            AddBinding(new TriggerBinding<float>(kGroup, "setOverlapSide", v => EditIfAnarchy(o => o.OverlapSide = HalfMetres(v, 8))));
+            AddBinding(new TriggerBinding<float>(kGroup, "setOverlapBack", v => EditIfAnarchy(o => o.OverlapBack = HalfMetres(v, 16))));
+            AddBinding(new TriggerBinding<float>(kGroup, "setCustomGap", v => Edit(o => o.CustomGap = HalfMetres(v, 8))));
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
@@ -99,12 +101,6 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<int>(kGroup, "setDensity", n => Edit(o =>
             {
                 o.Density = n >= 0 && n <= 3 ? (FillDensity)n : FillDensity.Normal;
-                // Max with no overlap would be the same as Dense: start from a modest overlap.
-                if (o.Density == FillDensity.Max && o.OverlapSide == 0 && o.OverlapBack == 0)
-                {
-                    o.OverlapSide = 2;
-                    o.OverlapBack = 4;
-                }
             })));
 
             // ---- List (preset) management ----
@@ -393,6 +389,9 @@ namespace BlockBuilder
             return sb.ToString();
         }
 
+        /// <summary>Rounds to 0.5 m and clamps to 0..max.</summary>
+        private static float HalfMetres(float v, float max) => float.IsNaN(v) ? 0 : System.Math.Max(0, System.Math.Min(max, (float)System.Math.Round(v * 2) / 2));
+
         /// <summary>Overlap values only change while Anarchy is on (they have no effect otherwise).</summary>
         private static void EditIfAnarchy(System.Action<Setting> change)
         {
@@ -480,6 +479,7 @@ namespace BlockBuilder
             Prop(sb, "density", (int)o.Density);
             Prop(sb, "overlapSide", o.OverlapSide);
             Prop(sb, "overlapBack", o.OverlapBack);
+            Prop(sb, "customGap", o.CustomGap);
             Prop(sb, "anarchyInstalled", AnarchyLink.Installed);
             Prop(sb, "anarchyOn", AnarchyLink.Enabled);
             Prop(sb, "generateRoads", o.GenerateRoads);
@@ -547,6 +547,15 @@ namespace BlockBuilder
         private static void Prop(StringBuilder sb, string name, bool value, bool last = false)
         {
             sb.Append('"').Append(name).Append("\":").Append(value ? "true" : "false");
+            if (!last)
+            {
+                sb.Append(',');
+            }
+        }
+
+        private static void Prop(StringBuilder sb, string name, float value, bool last = false)
+        {
+            sb.Append('"').Append(name).Append("\":").Append(value.ToString("0.###", CultureInfo.InvariantCulture));
             if (!last)
             {
                 sb.Append(',');

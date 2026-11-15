@@ -45,12 +45,12 @@ namespace BlockBuilder
                 "영역 선택 방식", "칠하기: 브러시로 자유롭게 칠합니다(왼쪽 드래그 칠하기, 오른쪽 드래그나 Ctrl+드래그 지우기). 도로는 벽처럼 칠해지지 않고, 경계는 곡선까지 연석에 맞춰집니다. 직접 그리기: 꼭짓점을 직접 찍습니다.");
             d[s.GetEnumValueLocaleID(AreaSelect.Paint)] = ko ? "칠하기" : "Paint";
             d[s.GetEnumValueLocaleID(AreaSelect.Draw)] = ko ? "직접 그리기" : "Draw";
-            Opt(nameof(Setting.Density), "Fill density", "Relaxed leaves 4 m between lots. Dense searches every 2 m to fill odd gaps. Max is Dense plus the overlap allowances below and needs the Anarchy mod switched on.",
-                "채움 강도", "여유: 필지 사이를 4m 띄웁니다. 촘촘: 2m 단위로 빈틈까지 찾습니다. 최대: 촘촘 + 아래 겹침 허용, Anarchy 모드를 켜야 적용됩니다.");
+            Opt(nameof(Setting.Density), "Fill density", "Relaxed leaves 4 m between lots. Dense searches every 2 m to fill odd gaps. Custom: set the gap and the overlaps yourself in the panel, in 0.5 m steps (overlaps need the Anarchy mod switched on).",
+                "채움 강도", "여유: 필지 사이를 4m 띄웁니다. 촘촘: 2m 단위로 빈틈까지 찾습니다. 사용자 지정: 패널에서 간격과 겹침을 0.5m 단위로 직접 정합니다(겹침은 Anarchy를 켜야 적용).");
             d[s.GetEnumValueLocaleID(FillDensity.Relaxed)] = ko ? "여유" : "Relaxed";
             d[s.GetEnumValueLocaleID(FillDensity.Normal)] = ko ? "보통" : "Normal";
             d[s.GetEnumValueLocaleID(FillDensity.Dense)] = ko ? "촘촘" : "Dense";
-            d[s.GetEnumValueLocaleID(FillDensity.Max)] = ko ? "최대 (Anarchy)" : "Max (Anarchy)";
+            d[s.GetEnumValueLocaleID(FillDensity.Custom)] = ko ? "사용자 지정" : "Custom";
             Opt(nameof(Setting.OverlapSide), "Overlap left/right (m)", "Lots may overlap neighbours and existing buildings by this much at each side. Never roads. Applied only while the Anarchy mod is on.",
                 "좌우 겹침 (m)", "필지가 양옆으로 이만큼 이웃 건물과 겹칠 수 있습니다. 도로와는 겹치지 않습니다. Anarchy 모드가 켜져 있을 때만 적용됩니다.");
             Opt(nameof(Setting.OverlapBack), "Overlap front/back (m)", "Lots may overlap by this much at the back (the front stays on the road), e.g. back-to-back rows in a shallow block. Applied only while the Anarchy mod is on.",
