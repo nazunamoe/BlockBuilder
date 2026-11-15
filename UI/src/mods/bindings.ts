@@ -15,6 +15,7 @@ export interface BuilderState {
     scope: number;
     fillRest: boolean;
     snapOff: number;
+    density: number;
     overlapSide: number;
     overlapBack: number;
     anarchyInstalled: boolean;
@@ -51,6 +52,39 @@ export const SNAP_CURB = 1; // ExistingGeometry
 export const SNAP_CELL = 2; // CellLength
 export const SNAP_ANGLE = 4; // StraightDirection
 
+export interface SearchResult {
+    name: string;
+    size: string;
+    inList: boolean;
+}
+
+export interface Search {
+    total: number;
+    category: number;
+    theme: string;
+    maxSize: number;
+    text: string;
+    maxAddAll: number;
+    results: SearchResult[];
+    categories: { id: number; label: string }[];
+    themes: string[];
+}
+
+/** FillDensity values on the C# side. */
+export const DENSITY = { normal: 0, relaxed: 1, dense: 2, max: 3 };
+
+export const searchBinding = bindValue<string>(GROUP, "search", "{}");
+
+const emptySearch: Search = { total: 0, category: -1, theme: "", maxSize: 0, text: "", maxAddAll: 300, results: [], categories: [], themes: [] };
+
+export function parseSearch(json: string): Search {
+    try {
+        return { ...emptySearch, ...JSON.parse(json) };
+    } catch {
+        return emptySearch;
+    }
+}
+
 export const stateBinding = bindValue<string>(GROUP, "state", "{}");
 export const listsBinding = bindValue<string>(GROUP, "lists", '{"palettes":[],"entries":[]}');
 
@@ -66,6 +100,7 @@ const emptyState: BuilderState = {
     scope: 0,
     fillRest: true,
     snapOff: 0,
+    density: 0,
     overlapSide: 0,
     overlapBack: 0,
     anarchyInstalled: false,
@@ -112,6 +147,19 @@ export const actions = {
     setOverlapBack: (n: number) => trigger(GROUP, "setOverlapBack", n),
     /** Anarchy's own UI trigger (group "Anarchy"); only call when Anarchy is installed. */
     toggleAnarchy: () => trigger("Anarchy", "AnarchyToggled"),
+    setDensity: (n: number) => trigger(GROUP, "setDensity", n),
+    newList: (name: string) => trigger(GROUP, "newList", name),
+    newListFromChecked: (name: string) => trigger(GROUP, "newListFromChecked", name),
+    duplicateList: () => trigger(GROUP, "duplicateList"),
+    renameList: (name: string) => trigger(GROUP, "renameList", name),
+    deleteList: () => trigger(GROUP, "deleteList"),
+    removeItem: (i: number) => trigger(GROUP, "removeItem", i),
+    addItem: (name: string) => trigger(GROUP, "addItem", name),
+    addResults: () => trigger(GROUP, "addResults"),
+    setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
+    setSearchCategory: (c: number) => trigger(GROUP, "setSearchCategory", c),
+    setSearchTheme: (s: string) => trigger(GROUP, "setSearchTheme", s),
+    setSearchMaxSize: (n: number) => trigger(GROUP, "setSearchMaxSize", n),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
     setFillInterior: (b: boolean) => trigger(GROUP, "setFillInterior", b),
     setBlockLength: (n: number) => trigger(GROUP, "setBlockLength", n),

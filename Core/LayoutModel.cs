@@ -62,6 +62,12 @@ namespace BlockBuilder.Core
 
         /// <summary>Metres a lot may overlap others at its back (depth direction); the front stays flush with the road.</summary>
         public double OverlapBack;
+
+        /// <summary>Empty metres left between neighbouring lots along a road (relaxed fill).</summary>
+        public double Gap;
+
+        /// <summary>Grid step for interior (no-road) items; independent of the frontage search step.</summary>
+        public double InteriorStep = 8;
     }
 
     public sealed class LayoutRequest

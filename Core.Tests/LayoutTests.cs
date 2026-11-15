@@ -343,8 +343,10 @@ namespace BlockBuilder.Core.Tests
             Assert.Equal(5, result.Placements.Count);
         }
 
-        [Fact]
-        public void LargePalette_LargeArea_IsFastEnough()
+        [Theory]
+        [InlineData(8.0)]
+        [InlineData(2.0)] // Dense / Max density search step
+        public void LargePalette_LargeArea_IsFastEnough(double step)
         {
             var rng = new Random(5);
             var request = new LayoutRequest
@@ -357,11 +359,17 @@ namespace BlockBuilder.Core.Tests
                     Road(604, -20, 604, 620, 8, 3),
                     Road(-20, 604, 620, 604, 8, 4),
                 },
-                Options = { GenerateRoads = true, NewRoadWidth = 16, MaxBlockLength = 160 },
+                Options = { GenerateRoads = true, NewRoadWidth = 16, MaxBlockLength = 160, Step = step, FillInterior = true },
             };
             for (int i = 0; i < 300; i++)
             {
                 request.Items.Add(Item("p" + i, rng.Next(1, 7), rng.Next(1, 7)));
+            }
+
+            // A few no-road items so the interior pass runs too.
+            for (int i = 0; i < 5; i++)
+            {
+                request.Items.Add(new PaletteItem { Id = "plaza" + i, Width = 16, Depth = 16, Weight = 1, RequiresRoad = false });
             }
 
             var watch = System.Diagnostics.Stopwatch.StartNew();

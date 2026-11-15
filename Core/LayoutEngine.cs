@@ -301,7 +301,7 @@ namespace BlockBuilder.Core
                     ctx.Result.Placements.Add(new Placement { ItemId = item.Id, Box = box, FrontageRoadId = front.RoadId, RoadIndex = front.RoadIndex });
                     Count(ctx, item.Id);
                     // With an overlap allowance the next lot may start that far inside this one.
-                    t += Math.Max(ctx.Options.Step / 2, item.Width - Math.Max(0, ctx.Options.OverlapSide));
+                    t += Math.Max(ctx.Options.Step / 2, item.Width - Math.Max(0, ctx.Options.OverlapSide) + Math.Max(0, ctx.Options.Gap));
                     placed = true;
                     break;
                 }
@@ -326,7 +326,8 @@ namespace BlockBuilder.Core
                 vMax = Math.Max(vMax, Vec2.Dot(p, v));
             }
 
-            double step = Math.Max(1, ctx.Options.Step);
+            // The interior grid has its own step: a fine frontage step (Dense) would make it 16x denser.
+            double step = Math.Max(1, ctx.Options.InteriorStep);
             for (double pv = vMin; pv <= vMax; pv += step)
             {
                 for (double pu = uMin; pu <= uMax; pu += step)

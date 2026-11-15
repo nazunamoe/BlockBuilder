@@ -85,6 +85,270 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setDensity", n => Edit(o =>
+            {
+                o.Density = n >= 0 && n <= 3 ? (FillDensity)n : FillDensity.Normal;
+                // Max with no overlap would be the same as Dense: start from a modest overlap.
+                if (o.Density == FillDensity.Max && o.OverlapSide == 0 && o.OverlapBack == 0)
+                {
+                    o.OverlapSide = 2;
+                    o.OverlapBack = 4;
+                }
+            })));
+
+            // ---- List (preset) management ----
+            AddBinding(new TriggerBinding<string>(kGroup, "newList", name => CreateList(name, fromChecked: false)));
+            AddBinding(new TriggerBinding<string>(kGroup, "newListFromChecked", name => CreateList(name, fromChecked: true)));
+            AddBinding(new TriggerBinding(kGroup, "duplicateList", DuplicateList));
+            AddBinding(new TriggerBinding<string>(kGroup, "renameList", RenameList));
+            AddBinding(new TriggerBinding(kGroup, "deleteList", DeleteList));
+            AddBinding(new TriggerBinding<int>(kGroup, "removeItem", RemoveItem));
+            AddBinding(new TriggerBinding<string>(kGroup, "addItem", name => AddItems(new[] { name })));
+            AddBinding(new TriggerBinding(kGroup, "addResults", () =>
+            {
+                // Guard against adding the whole catalog with one click.
+                var found = Search();
+                if (found.Count <= kMaxAddAll)
+                {
+                    AddItems(found.Select(b => b.Name));
+                }
+            }));
+
+            // ---- Catalog search (not persisted) ----
+            AddBinding(m_Search = new ValueBinding<string>(kGroup, "search", "{\"total\":0,\"results\":[],\"categories\":[],\"themes\":[]}"));
+            AddBinding(new TriggerBinding<string>(kGroup, "setSearchText", s => { m_SearchText = s ?? string.Empty; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c => { m_SearchCategory = c; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<string>(kGroup, "setSearchTheme", s => { m_SearchTheme = s ?? string.Empty; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMaxSize", n => { m_SearchMaxSize = System.Math.Max(0, System.Math.Min(12, n)); m_SearchKey = null; }));
+        }
+
+        // ---- List (preset) management ----
+
+        private const int kMaxSearchResults = 80;
+
+        /// <summary>"Add all" works up to this many matches (same cap as making a list from a filter).</summary>
+        private const int kMaxAddAll = 300;
+
+        private ValueBinding<string> m_Search;
+        private string m_SearchText = string.Empty;
+        private int m_SearchCategory = -1;
+        private string m_SearchTheme = string.Empty;
+        private int m_SearchMaxSize;
+        private string m_SearchKey;
+
+        private static void Select(string path)
+        {
+            int index = PaletteStore.IndexOf(path);
+            Edit(o =>
+            {
+                if (index >= 0)
+                {
+                    o.ActivePalette = index;
+                    o.DesignateItem = 0;
+                }
+            });
+        }
+
+        private static void CreateList(string name, bool fromChecked)
+        {
+            var options = Mod.Options;
+            if (options == null)
+            {
+                return;
+            }
+
+            var palette = new Core.Palette { Name = PaletteStore.UniqueName(name) };
+            if (fromChecked)
+            {
+                // The checked items of the current list, in its order (matches the count the panel shows).
+                var current = PaletteStore.Get(options.ActivePalette);
+                var names = current == null
+                    ? new List<string>()
+                    : current.Entries.Select(e => e.Prefab).Where(options.Checked.Contains).Distinct().ToList();
+                foreach (var n in names)
+                {
+                    var entry = current?.Entries.FirstOrDefault(e => e.Prefab == n);
+                    palette.Add(n, entry?.Weight ?? 1, entry?.MaxCount ?? 0);
+                }
+            }
+
+            Select(PaletteStore.Save(palette));
+        }
+
+        private static void DuplicateList()
+        {
+            var options = Mod.Options;
+            var current = options == null ? null : PaletteStore.Get(options.ActivePalette);
+            if (current == null)
+            {
+                return;
+            }
+
+            var copy = Core.Palette.Parse(current.Serialize());
+            copy.Name = PaletteStore.UniqueName(current.Name + (Mod.IsKorean ? " 복사본" : " copy"));
+            Select(PaletteStore.Save(copy));
+        }
+
+        private static void RenameList(string name)
+        {
+            var options = Mod.Options;
+            if (options == null || string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            string path = PaletteStore.Rename(options.ActivePalette, name);
+            if (path != null)
+            {
+                Select(path);
+            }
+        }
+
+        private static void DeleteList()
+        {
+            var options = Mod.Options;
+            if (options == null || PaletteStore.Get(options.ActivePalette) == null)
+            {
+                return;
+            }
+
+            PaletteStore.Delete(options.ActivePalette);
+            Edit(o =>
+            {
+                o.ActivePalette = System.Math.Max(0, System.Math.Min(o.ActivePalette, PaletteStore.All.Count - 1));
+                o.DesignateItem = 0;
+            });
+        }
+
+        private static void RemoveItem(int index)
+        {
+            var options = Mod.Options;
+            var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
+            if (palette == null || index < 0 || index >= palette.Entries.Count)
+            {
+                return;
+            }
+
+            palette.Entries.RemoveAt(index);
+            PaletteStore.Update(options.ActivePalette);
+            Edit(o => o.DesignateItem = System.Math.Max(0, System.Math.Min(o.DesignateItem, palette.Entries.Count - 1)));
+        }
+
+        private static void AddItems(IEnumerable<string> names)
+        {
+            var options = Mod.Options;
+            var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
+            if (palette == null)
+            {
+                return;
+            }
+
+            int before = palette.Entries.Count;
+            foreach (var n in names.Where(n => !string.IsNullOrEmpty(n)).ToList())
+            {
+                if (!palette.Entries.Any(e => e.Prefab == n))
+                {
+                    palette.Add(n);
+                }
+            }
+
+            if (palette.Entries.Count != before)
+            {
+                PaletteStore.Update(options.ActivePalette);
+                Edit(o => { });
+            }
+        }
+
+        private List<BuildingEntry> Search()
+        {
+            if (!m_Catalog.Ready)
+            {
+                return new List<BuildingEntry>();
+            }
+
+            var filter = new Core.CatalogFilter
+            {
+                Text = m_SearchText.Trim(),
+                Source = Core.SourceFilter.All,
+                IncludeSignature = true,
+                IncludeWaterfront = true,
+            };
+            if (m_SearchCategory >= 0)
+            {
+                filter.Categories.Add((Core.ItemCategory)m_SearchCategory);
+            }
+
+            if (!string.IsNullOrEmpty(m_SearchTheme))
+            {
+                filter.Themes.Add(m_SearchTheme);
+            }
+
+            if (m_SearchMaxSize > 0)
+            {
+                filter.MaxWidth = m_SearchMaxSize;
+                filter.MaxDepth = m_SearchMaxSize;
+            }
+
+            return m_Catalog.Buildings.Where(b => filter.Matches(b.Item)).GroupBy(b => b.Name).Select(g => g.First()).ToList();
+        }
+
+        private string BuildSearch(Setting o)
+        {
+            var all = Search();
+            var palette = PaletteStore.Get(o.ActivePalette);
+            var inList = new HashSet<string>(palette?.Entries.Select(e => e.Prefab) ?? Enumerable.Empty<string>());
+            var sb = new StringBuilder(8192);
+            sb.Append('{');
+            Prop(sb, "total", all.Count);
+            Prop(sb, "category", m_SearchCategory);
+            Prop(sb, "theme", m_SearchTheme);
+            Prop(sb, "maxSize", m_SearchMaxSize);
+            Prop(sb, "text", m_SearchText);
+            Prop(sb, "maxAddAll", kMaxAddAll);
+            sb.Append("\"results\":[");
+            bool first = true;
+            foreach (var b in all.Take(kMaxSearchResults))
+            {
+                if (!first)
+                {
+                    sb.Append(',');
+                }
+
+                first = false;
+                sb.Append('{');
+                Prop(sb, "name", b.Name);
+                Prop(sb, "size", $"{b.LotWidth}x{b.LotDepth}");
+                Prop(sb, "inList", inList.Contains(b.Name), last: true);
+                sb.Append('}');
+            }
+
+            sb.Append("],\"categories\":[");
+            first = true;
+            foreach (Core.ItemCategory c in System.Enum.GetValues(typeof(Core.ItemCategory)))
+            {
+                if (c == Core.ItemCategory.Other)
+                {
+                    continue;
+                }
+
+                if (!first)
+                {
+                    sb.Append(',');
+                }
+
+                first = false;
+                sb.Append('{');
+                Prop(sb, "id", (int)c);
+                Prop(sb, "label", Mod.IsKorean ? BuilderLocale.CategoryKo(c) : c.ToString(), last: true);
+                sb.Append('}');
+            }
+
+            sb.Append("],\"themes\":");
+            WriteArray(sb, m_Catalog.Ready
+                ? m_Catalog.Buildings.Select(b => b.Item.Theme).Where(t => !string.IsNullOrEmpty(t)).Distinct().OrderBy(t => t, System.StringComparer.Ordinal)
+                : Enumerable.Empty<string>());
+            sb.Append('}');
+            return sb.ToString();
         }
 
         /// <summary>Overlap values only change while Anarchy is on (they have no effect otherwise).</summary>
@@ -131,6 +395,17 @@ namespace BlockBuilder
                 m_Tool.Toggle();
             }
 
+            // The catalog search runs only while the builder is open and only when something changed.
+            if (m_Tool.IsActive)
+            {
+                string searchKey = $"{m_SearchText}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchMaxSize}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
+                if (searchKey != m_SearchKey)
+                {
+                    m_SearchKey = searchKey;
+                    m_Search.Update(BuildSearch(options));
+                }
+            }
+
             string listsKey = $"{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{options.CheckedItems}";
             if (listsKey != m_ListsKey)
             {
@@ -156,6 +431,7 @@ namespace BlockBuilder
             Prop(sb, "scope", o.Scope == ItemScope.Checked ? 1 : 0);
             Prop(sb, "fillRest", !o.PlacedOnly);
             Prop(sb, "snapOff", o.SnapOff);
+            Prop(sb, "density", (int)o.Density);
             Prop(sb, "overlapSide", o.OverlapSide);
             Prop(sb, "overlapBack", o.OverlapBack);
             Prop(sb, "anarchyInstalled", AnarchyLink.Installed);

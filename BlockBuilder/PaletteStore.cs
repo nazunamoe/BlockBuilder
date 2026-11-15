@@ -75,13 +75,99 @@ namespace BlockBuilder
         public static string Save(Palette palette)
         {
             System.IO.Directory.CreateDirectory(Directory);
-            string name = string.IsNullOrWhiteSpace(palette.Name) ? "palette" : palette.Name;
-            var safe = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray()).Trim();
-            string path = Path.Combine(Directory, safe + ".txt");
+            string path = PathFor(palette.Name);
             File.WriteAllText(path, palette.Serialize(), new UTF8Encoding(false));
             Reload();
             Mod.log.Info($"palette saved: {path} ({palette.Entries.Count} entries)");
             return path;
+        }
+
+        private static string PathFor(string name)
+        {
+            name = string.IsNullOrWhiteSpace(name) ? "palette" : name.Trim();
+            var safe = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray()).Trim();
+            return Path.Combine(Directory, safe + ".txt");
+        }
+
+        public static int IndexOf(string path)
+        {
+            var all = All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (string.Equals(Path.GetFullPath(all[i].Path), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>A name not used by another list file: "Name", "Name 2", "Name 3" ...</summary>
+        public static string UniqueName(string name)
+        {
+            name = string.IsNullOrWhiteSpace(name) ? "My list" : name.Trim();
+            string candidate = name;
+            for (int n = 2; File.Exists(PathFor(candidate)); n++)
+            {
+                candidate = $"{name} {n}";
+            }
+
+            return candidate;
+        }
+
+        /// <summary>Writes an edited list back to its own file.</summary>
+        public static void Update(int index)
+        {
+            var all = All;
+            if (index < 0 || index >= all.Count)
+            {
+                return;
+            }
+
+            File.WriteAllText(all[index].Path, all[index].Palette.Serialize(), new UTF8Encoding(false));
+            Version++;
+        }
+
+        public static void Delete(int index)
+        {
+            var all = All;
+            if (index < 0 || index >= all.Count)
+            {
+                return;
+            }
+
+            File.Delete(all[index].Path);
+            Mod.log.Info($"palette deleted: {all[index].Path}");
+            Reload();
+        }
+
+        /// <summary>Renames the list and its file; returns the new path.</summary>
+        public static string Rename(int index, string newName)
+        {
+            var all = All;
+            if (index < 0 || index >= all.Count || string.IsNullOrWhiteSpace(newName))
+            {
+                return null;
+            }
+
+            var (oldPath, palette) = all[index];
+            string target = PathFor(newName);
+            if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(oldPath), StringComparison.OrdinalIgnoreCase) && File.Exists(target))
+            {
+                newName = UniqueName(newName);
+                target = PathFor(newName);
+            }
+
+            palette.Name = newName.Trim();
+            File.WriteAllText(target, palette.Serialize(), new UTF8Encoding(false));
+            if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(oldPath), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(oldPath);
+            }
+
+            Reload();
+            return target;
         }
     }
 }

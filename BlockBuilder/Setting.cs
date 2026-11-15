@@ -20,6 +20,16 @@ namespace BlockBuilder
         RowOnNewRoad,
     }
 
+    /// <summary>How hard the fill packs lots. Normal is 0 so a missing saved value means Normal.</summary>
+    public enum FillDensity
+    {
+        Normal,
+        Relaxed,
+        Dense,
+        /// <summary>Dense plus the overlap allowances; needs Anarchy on.</summary>
+        Max,
+    }
+
     /// <summary>Which list entries the fill uses.</summary>
     public enum ItemScope
     {
@@ -153,14 +163,15 @@ namespace BlockBuilder
         [SettingsUIHidden]
         public int SnapOff { get; set; }
 
-        /// <summary>Metres lots may overlap at each side (left/right); applied only while Anarchy is on.</summary>
-        [SettingsUISlider(min = 0, max = 8, step = 1)]
         [SettingsUISection(kBuilderTab, kBuildGroup)]
+        public FillDensity Density { get; set; }
+
+        /// <summary>Metres lots may overlap at each side (left/right); applied only at Max density with Anarchy on. Set in the panel.</summary>
+        [SettingsUIHidden]
         public int OverlapSide { get; set; }
 
-        /// <summary>Metres lots may overlap at the back (front/back direction); applied only while Anarchy is on.</summary>
-        [SettingsUISlider(min = 0, max = 16, step = 1)]
-        [SettingsUISection(kBuilderTab, kBuildGroup)]
+        /// <summary>Metres lots may overlap at the back; applied only at Max density with Anarchy on. Set in the panel.</summary>
+        [SettingsUIHidden]
         public int OverlapBack { get; set; }
 
         [SettingsUISection(kBuilderTab, kBuildGroup)]

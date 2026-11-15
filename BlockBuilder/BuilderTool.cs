@@ -122,11 +122,20 @@ namespace BlockBuilder
         }
 
         /// <summary>Overlap allowances in effect: only while Anarchy is on (the game blocks overlaps otherwise).</summary>
-        internal static double EffectiveSide(Setting options) => options.OverlapSide > 0 && AnarchyLink.Enabled ? options.OverlapSide : 0;
+        internal static double EffectiveSide(Setting options) => MaxActive(options) ? options.OverlapSide : 0;
 
-        internal static double EffectiveBack(Setting options) => options.OverlapBack > 0 && AnarchyLink.Enabled ? options.OverlapBack : 0;
+        internal static double EffectiveBack(Setting options) => MaxActive(options) ? options.OverlapBack : 0;
 
-        private static bool WantsOverlap(Setting options) => options.OverlapSide > 0 || options.OverlapBack > 0;
+        /// <summary>Max density packs with overlaps, which the game only allows while Anarchy is on.</summary>
+        private static bool MaxActive(Setting options) => options.Density == FillDensity.Max && AnarchyLink.Enabled;
+
+        private static bool WantsOverlap(Setting options) => options.Density == FillDensity.Max;
+
+        /// <summary>Gap between lots along a road for the density level.</summary>
+        internal static double DensityGap(Setting options) => options.Density == FillDensity.Relaxed ? 4 : 0;
+
+        /// <summary>Search step along the road: finer steps find lots in odd gaps.</summary>
+        internal static double DensityStep(Setting options) => options.Density == FillDensity.Dense || options.Density == FillDensity.Max ? 2 : 8;
 
         protected override void OnStartRunning()
         {
@@ -434,7 +443,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{EffectiveSide(options)}|{EffectiveBack(options)}|{m_Fixed.Count}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{EffectiveSide(options)}|{EffectiveBack(options)}|{m_Fixed.Count}|{options.Revision}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -656,6 +665,8 @@ namespace BlockBuilder
                     Mode = options.PlacementMode,
                     OverlapSide = EffectiveSide(options),
                     OverlapBack = EffectiveBack(options),
+                    Gap = DensityGap(options),
+                    Step = DensityStep(options),
                 },
                 Fixed = m_Fixed.Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
             };
@@ -677,11 +688,11 @@ namespace BlockBuilder
             if (WantsOverlap(options) && !AnarchyLink.Enabled && m_Plan.Placements.Count > 0)
             {
                 Note(
-                    AnarchyLink.Installed ? "overlap allowance needs Anarchy switched on; lots kept apart" : "overlap allowance needs the Anarchy mod; lots kept apart",
-                    AnarchyLink.Installed ? "겹침 허용은 Anarchy를 켜야 적용됩니다. 지금은 겹치지 않게 배치했습니다" : "겹침 허용은 Anarchy 모드가 있어야 합니다. 지금은 겹치지 않게 배치했습니다");
+                    AnarchyLink.Installed ? "max density needs Anarchy switched on; filled densely without overlaps" : "max density needs the Anarchy mod; filled densely without overlaps",
+                    AnarchyLink.Installed ? "최대 채움은 Anarchy를 켜야 적용됩니다. 지금은 겹침 없이 촘촘하게 채웠습니다" : "최대 채움은 Anarchy 모드가 필요합니다. 지금은 겹침 없이 촘촘하게 채웠습니다");
             }
 
-            Mod.log.Info($"builder: plan overlap={EffectiveSide(options)}/{EffectiveBack(options)} anarchy={AnarchyLink.Enabled} mode={options.PlacementMode} scope={options.Scope} checked={options.Checked.Count} palette='{palette.Name}' items={items.Count} existingRoadSegments={request.ExistingRoads.Count} existingBuildings={request.Obstacles.Count} -> buildings={m_Plan.Placements.Count} streets={m_Plan.Roads.Count} in {watch.ElapsedMilliseconds} ms");
+            Mod.log.Info($"builder: plan density={options.Density} overlap={EffectiveSide(options)}/{EffectiveBack(options)} anarchy={AnarchyLink.Enabled} mode={options.PlacementMode} scope={options.Scope} checked={options.Checked.Count} palette='{palette.Name}' items={items.Count} existingRoadSegments={request.ExistingRoads.Count} existingBuildings={request.Obstacles.Count} -> buildings={m_Plan.Placements.Count} streets={m_Plan.Roads.Count} in {watch.ElapsedMilliseconds} ms");
             foreach (var w in m_Plan.Warnings)
             {
                 Mod.log.Info($"builder: warning: {w}");

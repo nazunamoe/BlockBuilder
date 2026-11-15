@@ -1,5 +1,5 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { Icon } from "cs2/ui";
+import { Component, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { getModule } from "cs2/modding";
 import styles from "./builder-panel.module.scss";
 
 /** localStorage may be missing or throw in the game's UI host; never let that break the panel. */
@@ -89,6 +89,14 @@ export function useDraggable(storageKey: string, initial: Position, size: { widt
     return { pos, onHandleDown, reset };
 }
 
+/**
+ * Single-colour icon drawn the way the game does it (tinted-icon.tsx): a div filled with the
+ * text colour and masked by the SVG, so the glyph takes the colour of its CSS class.
+ */
+export const Glyph = ({ src, className }: { src: string; className?: string }) => (
+    <div className={`${styles.glyphBase} ${className ?? ""}`} style={{ maskImage: `url(${src})` } as React.CSSProperties} />
+);
+
 /** Collapsible section; open/closed state is remembered per section id. */
 export const Section = ({
     id,
@@ -108,7 +116,7 @@ export const Section = ({
     <div className={`${styles.section} ${open ? "" : styles.collapsed}`}>
         <div className={styles.sectionHeader}>
             <button className={styles.sectionTitle} onClick={() => onToggle(id)}>
-                <Icon className={`${styles.chevron} ${open ? "" : styles.chevronClosed}`} src="Media/Glyphs/StrokeArrowDown.svg" tinted />
+                <Glyph className={`${styles.chevron} ${open ? "" : styles.chevronClosed}`} src="Media/Glyphs/StrokeArrowDown.svg" />
                 {title}
             </button>
             {extra && <div className={styles.sectionExtra}>{extra}</div>}
@@ -146,6 +154,7 @@ export const Stepper = ({
     step,
     onChange,
     disabled,
+    display,
 }: {
     label: string;
     value: number;
@@ -153,6 +162,8 @@ export const Stepper = ({
     step: number;
     onChange: (v: number) => void;
     disabled?: boolean;
+    /** Shown instead of the number, e.g. "no limit" for 0. */
+    display?: string;
 }) => (
     <div className={`${styles.stepper} ${disabled ? styles.disabled : ""}`}>
         <span className={styles.stepperLabel}>{label}</span>
@@ -160,8 +171,8 @@ export const Stepper = ({
             -
         </button>
         <span className={styles.stepValue}>
-            {value}
-            <small>{unit}</small>
+            {display ?? value}
+            {display === undefined && <small>{unit}</small>}
         </span>
         <button className={styles.stepButton} disabled={disabled} onClick={() => onChange(value + step)}>
             +
@@ -169,8 +180,74 @@ export const Stepper = ({
     </div>
 );
 
+/**
+ * The game's own text input: while it has focus the game's shortcuts are suspended, so typing a
+ * name does not trigger tools. Falls back to a plain input if the module is not found.
+ */
+const GameTextInput: any = (() => {
+    try {
+        return getModule("game-ui/common/input/text/text-input.tsx", "TextInput");
+    } catch {
+        return undefined;
+    }
+})();
+
+export const TextField = ({ value, onChange, onEnter, className }: { value: string; onChange: (v: string) => void; onEnter?: () => void; className?: string }) => {
+    const onKeyDown = (e: React.KeyboardEvent) => {
+        if (e.keyCode === 13 && onEnter) {
+            onEnter();
+        }
+    };
+    const handle = (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value);
+    const plain = <input className={`${styles.input} ${className ?? ""}`} value={value} onChange={handle} onKeyDown={onKeyDown} />;
+    return GameTextInput ? (
+        <Fallback fallback={plain}>
+            <GameTextInput className={`${styles.input} ${className ?? ""}`} value={value} onChange={handle} onKeyDown={onKeyDown} />
+        </Fallback>
+    ) : (
+        plain
+    );
+};
+
+/** Renders the fallback if the child throws (e.g. the game input needs context we do not provide). */
+class Fallback extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+    state = { failed: false };
+
+    static getDerivedStateFromError() {
+        return { failed: true };
+    }
+
+    render() {
+        return this.state.failed ? this.props.fallback : this.props.children;
+    }
+}
+
+/** Inline name prompt: text field with confirm / cancel. */
+export const NamePrompt = ({ label, initial, okLabel, cancelLabel, onOk, onCancel }: { label: string; initial: string; okLabel: string; cancelLabel: string; onOk: (name: string) => void; onCancel: () => void }) => {
+    const [name, setName] = useState(initial);
+    const ok = () => {
+        if (name.trim() !== "") {
+            onOk(name.trim());
+        }
+    };
+    return (
+        <div className={styles.prompt}>
+            <div className={styles.promptLabel}>{label}</div>
+            <div className={styles.promptRow}>
+                <TextField value={name} onChange={setName} onEnter={ok} className={styles.promptInput} />
+                <button className={`${styles.chip} ${styles.chipPrimary}`} onClick={ok}>
+                    {okLabel}
+                </button>
+                <button className={styles.chip} onClick={onCancel}>
+                    {cancelLabel}
+                </button>
+            </div>
+        </div>
+    );
+};
+
 export const Check = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
     <button className={`${styles.check} ${checked ? styles.checkOn : ""}`} onClick={onClick}>
-        {checked && <Icon className={styles.glyphSmall} src="Media/Glyphs/Checkmark.svg" tinted />}
+        {checked && <Glyph className={styles.glyphSmall} src="Media/Glyphs/Checkmark.svg" />}
     </button>
 );

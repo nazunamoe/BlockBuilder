@@ -41,6 +41,12 @@ namespace BlockBuilder
                 "지정할 항목", "영역을 닫은 뒤 Shift+클릭하면 이 항목을 가장 가까운 도로에 붙여 놓습니다. 지정한 항목 위에서 Shift+오른쪽 클릭하면 그 항목을 지웁니다 (빈 곳에서는 마지막 항목).");
             d[s.GetEnumValueLocaleID(FillMode.Fill)] = ko ? "채우기" : "Fill";
             d[s.GetEnumValueLocaleID(FillMode.FixedOnly)] = ko ? "지정만" : "Designated only";
+            Opt(nameof(Setting.Density), "Fill density", "Relaxed leaves 4 m between lots. Dense searches every 2 m to fill odd gaps. Max is Dense plus the overlap allowances below and needs the Anarchy mod switched on.",
+                "채움 강도", "여유: 필지 사이를 4m 띄웁니다. 촘촘: 2m 단위로 빈틈까지 찾습니다. 최대: 촘촘 + 아래 겹침 허용, Anarchy 모드를 켜야 적용됩니다.");
+            d[s.GetEnumValueLocaleID(FillDensity.Relaxed)] = ko ? "여유" : "Relaxed";
+            d[s.GetEnumValueLocaleID(FillDensity.Normal)] = ko ? "보통" : "Normal";
+            d[s.GetEnumValueLocaleID(FillDensity.Dense)] = ko ? "촘촘" : "Dense";
+            d[s.GetEnumValueLocaleID(FillDensity.Max)] = ko ? "최대 (Anarchy)" : "Max (Anarchy)";
             Opt(nameof(Setting.OverlapSide), "Overlap left/right (m)", "Lots may overlap neighbours and existing buildings by this much at each side. Never roads. Applied only while the Anarchy mod is on.",
                 "좌우 겹침 (m)", "필지가 양옆으로 이만큼 이웃 건물과 겹칠 수 있습니다. 도로와는 겹치지 않습니다. Anarchy 모드가 켜져 있을 때만 적용됩니다.");
             Opt(nameof(Setting.OverlapBack), "Overlap front/back (m)", "Lots may overlap by this much at the back (the front stays on the road), e.g. back-to-back rows in a shallow block. Applied only while the Anarchy mod is on.",
@@ -76,7 +82,7 @@ namespace BlockBuilder
             d[s.GetEnumValueLocaleID(SourceFilter.Mods)] = ko ? "모드" : "Mods";
         }
 
-        private static string CategoryKo(ItemCategory c)
+        internal static string CategoryKo(ItemCategory c)
         {
             switch (c)
             {

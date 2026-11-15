@@ -46,6 +46,38 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void Gap_LeavesSpaceBetweenLots()
+        {
+            var request = Row(104, 0);
+            request.Options.Gap = 4;
+            var result = LayoutEngine.Run(request);
+            Assert.Equal(3, result.Placements.Count);
+            var xs = result.Placements.Select(p => p.Box.Center.X).OrderBy(x => x).ToList();
+            for (int i = 0; i + 1 < xs.Count; i++)
+            {
+                Assert.True(xs[i + 1] - xs[i] >= 28 - 1e-6);
+            }
+        }
+
+        [Fact]
+        public void FinerStep_FindsLotsCoarseStepMisses()
+        {
+            // An existing building leaves a 26 m gap starting at x = 3: an 8 m search step only tries
+            // x = 0, 8, 16 ... and misses it; a 1 m step finds it.
+            LayoutRequest Gap(double step) => new LayoutRequest
+            {
+                Boundary = new List<Vec2> { new Vec2(0, 0), new Vec2(29, 0), new Vec2(29, 40), new Vec2(0, 40) },
+                ExistingRoads = { new RoadSegment { A = new Vec2(-20, -8), B = new Vec2(60, -8), Width = 16, Id = 1 } },
+                Obstacles = { new Obb(new Vec2(1.5, 12), new Vec2(0, -1), 3, 24) },
+                Items = { new PaletteItem { Id = "house", Width = 24, Depth = 24, Weight = 1, RequiresRoad = true } },
+                Options = new LayoutOptions { Step = step },
+            };
+
+            Assert.Empty(LayoutEngine.Run(Gap(8)).Placements);
+            Assert.Single(LayoutEngine.Run(Gap(1)).Placements);
+        }
+
+        [Fact]
         public void BackOnly_DoesNotPackSideways()
         {
             // Back overlap alone keeps neighbours along the road apart.
