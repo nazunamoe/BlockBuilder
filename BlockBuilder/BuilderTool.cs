@@ -172,6 +172,8 @@ namespace BlockBuilder
 
         private void ResetAll()
         {
+            m_Frozen.Clear();
+            m_Moving = null;
             m_Picked = false;
             m_Paint?.Clear();
             m_Regions = new List<PaintRegion>();
@@ -251,6 +253,11 @@ namespace BlockBuilder
             bool shift = keyboard != null && keyboard.shiftKey.isPressed;
             bool overUI = Game.Input.InputManager.instance != null && Game.Input.InputManager.instance.mouseOverUI;
             FinishStrokeIfReleased(mouse); // before the panel check: a stroke may be released over the panel
+            if (overUI && m_Moving != null && mouse != null && !mouse.leftButton.isPressed)
+            {
+                m_Moving = null; // dropped on the panel: cancel the move
+            }
+
             if (overUI)
             {
                 DrawOverlay();
@@ -286,6 +293,13 @@ namespace BlockBuilder
 
                 DrawOverlay();
                 return inputDeps;
+            }
+
+            bool ctrl = keyboard != null && keyboard.ctrlKey.isPressed;
+            if (UpdateMove(options, mouse, ctrl))
+            {
+                DrawOverlay();
+                return m_State == State.Planned ? ReplanIfChanged(options, inputDeps) : inputDeps;
             }
 
             if (options.Selection == AreaSelect.Paint)
@@ -349,7 +363,7 @@ namespace BlockBuilder
                 return inputDeps;
             }
 
-            bool click = !shift && applyAction.WasPressedThisFrame();
+            bool click = !shift && !ctrl && applyAction.WasPressedThisFrame();
             if (m_State == State.Drawing)
             {
                 if (shiftLeft)
@@ -364,6 +378,7 @@ namespace BlockBuilder
                     {
                         m_State = State.Planned;
                         m_PlanKey = string.Empty;
+                        m_Frozen.Clear();
                         Mod.log.Info($"builder: area closed with {m_Points.Count} corners");
                     }
                     else
@@ -549,6 +564,7 @@ namespace BlockBuilder
             }
 
             m_Picked = m_Regions.Count > 0;
+            m_Frozen.Clear(); // the area changed: lay it out afresh
             m_State = m_Picked ? State.Planned : State.Drawing;
             m_PlanKey = string.Empty;
             double area = m_Regions.Sum(x => x.Area);
@@ -560,6 +576,142 @@ namespace BlockBuilder
             {
                 m_Status = string.Empty;
             }
+        }
+
+        // ---- Moving lots in the preview (Ctrl+drag) ----
+
+        /// <summary>
+        /// Lots of the current plan pinned after the first move, so moving one building does not
+        /// reshuffle the others. Released when the layout options or the area change.
+        /// </summary>
+        private readonly List<Placement> m_Frozen = new List<Placement>();
+        private string m_FrozenBase = string.Empty;
+        private Placement m_Moving;
+        private Obb m_MoveGhost;
+        private bool m_MoveOk;
+        private int m_MoveVersion;
+
+        /// <summary>The options that decide the layout (not the area, the pins or the brush).</summary>
+        private static string OptionsKey(Setting o) =>
+            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
+
+        /// <summary>
+        /// Ctrl+left drag on a lot of the preview moves it: the lot follows the cursor, snapped against
+        /// the nearest road and facing it, and is dropped on release if it overlaps nothing. Returns
+        /// true while it handles the mouse (start, drag or drop).
+        /// </summary>
+        private bool UpdateMove(Setting options, UnityEngine.InputSystem.Mouse mouse, bool ctrl)
+        {
+            if (mouse == null)
+            {
+                return false;
+            }
+
+            if (m_Moving == null)
+            {
+                if (!ctrl || !mouse.leftButton.wasPressedThisFrame || m_State != State.Planned || m_Plan == null || !m_HasCursor)
+                {
+                    return false;
+                }
+
+                var at = new Vec2(m_Cursor.x, m_Cursor.z);
+                var hit = m_Plan.Placements.LastOrDefault(x => Polygon.PointInObb(x.Box, at));
+                if (hit == null)
+                {
+                    return false; // not on a lot: in paint mode Ctrl+drag erases
+                }
+
+                m_Moving = hit;
+                m_MoveGhost = hit.Box;
+                m_MoveOk = true;
+                return true;
+            }
+
+            if (mouse.leftButton.isPressed)
+            {
+                if (m_HasCursor)
+                {
+                    m_MoveGhost = MoveTarget(m_Moving, new Vec2(m_Cursor.x, m_Cursor.z));
+                    m_MoveOk = MoveFits(m_Moving, m_MoveGhost);
+                }
+
+                return true;
+            }
+
+            // Released: drop.
+            var moving = m_Moving;
+            m_Moving = null;
+            if (Vec2.Distance(moving.Box.Center, m_MoveGhost.Center) < 0.5 && Vec2.Dot(moving.Box.Forward, m_MoveGhost.Forward) > 0.999)
+            {
+                return true;
+            }
+
+            if (!m_MoveOk)
+            {
+                Note("cannot drop there: it would overlap a building or a road", "그 자리에는 놓을 수 없습니다 (건물이나 도로와 겹침)");
+                return true;
+            }
+
+            if (m_Frozen.Count == 0)
+            {
+                foreach (var p in m_Plan.Placements.Where(p => !p.IsFixed))
+                {
+                    m_Frozen.Add(new Placement { ItemId = p.ItemId, Box = p.Box });
+                }
+
+                m_FrozenBase = OptionsKey(options);
+            }
+
+            // Plan placements are copies: find the pinned one by item and position.
+            bool Same(Placement p) => p.ItemId == moving.ItemId && Vec2.Distance(p.Box.Center, moving.Box.Center) < 0.01;
+            var pinned = m_Fixed.FirstOrDefault(Same) ?? m_Frozen.FirstOrDefault(Same);
+            if (pinned == null)
+            {
+                m_Frozen.Add(pinned = new Placement { ItemId = moving.ItemId });
+            }
+
+            pinned.Box = m_MoveGhost;
+            m_MoveVersion++;
+            Note($"moved {moving.ItemId}", $"{moving.ItemId}을(를) 옮겼습니다");
+            return true;
+        }
+
+        /// <summary>Where a dragged lot goes: against the nearest road and facing it, or at the cursor.</summary>
+        private Obb MoveTarget(Placement lot, Vec2 at)
+        {
+            var entry = m_Catalog.FindBuilding(lot.ItemId);
+            if (entry == null || entry.RequiresRoad)
+            {
+                var roads = m_LastRoads.Concat(PlannedRoadSegments()).ToList();
+                if (roads.Any(r => Core.Segment.Distance(r.A, r.B, at, out _) - r.Width / 2 <= 48))
+                {
+                    return LayoutEngine.SnapToFrontage(roads, at, lot.Box.Width, lot.Box.Depth);
+                }
+            }
+
+            return new Obb(at, lot.Box.Forward, lot.Box.Width, lot.Box.Depth);
+        }
+
+        /// <summary>A dropped lot may not overlap another lot of the plan or a road.</summary>
+        private bool MoveFits(Placement lot, Obb box)
+        {
+            foreach (var other in m_Plan.Placements)
+            {
+                if (!ReferenceEquals(other, lot) && box.Overlaps(other.Box, 0.01))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var r in m_LastRoads.Concat(PlannedRoadSegments()))
+            {
+                if (box.Overlaps(Obb.FromSegment(r.A, r.B, r.Width), 0.01))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         // ---- Corner snapping while drawing ----
@@ -650,10 +802,17 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{EffectiveSide(options)}|{EffectiveBack(options)}|{m_Fixed.Count}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
+            if (m_Frozen.Count > 0 && OptionsKey(options) != m_FrozenBase)
+            {
+                // A shuffle or another layout option redoes the whole layout: moved lots are released.
+                m_Frozen.Clear();
+                Note("layout redone; moved buildings are no longer pinned", "배치를 새로 짰습니다. 옮긴 건물의 고정이 풀렸습니다");
+            }
+
             string key = PlanKey(options);
             if (key == m_PlanKey)
             {
@@ -785,6 +944,7 @@ namespace BlockBuilder
 
             m_Points.Clear();
             m_Fixed.Clear();
+            m_Frozen.Clear();
             m_Paint?.Clear();
             m_Regions = new List<PaintRegion>();
             m_Picked = false;
@@ -881,7 +1041,7 @@ namespace BlockBuilder
                     Gap = DensityGap(options),
                     Step = DensityStep(options),
                 },
-                Fixed = m_Fixed.Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
+                Fixed = m_Fixed.Concat(m_Frozen).Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
             };
             CollectRoads(request);
             CollectBuildings(request);
@@ -957,7 +1117,7 @@ namespace BlockBuilder
                     Obstacles = shared.Obstacles,
                     Options = shared.Options,
                     Items = RemainingItems(shared.Items, counts),
-                    Fixed = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center)).ToList(),
+                    Fixed = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center) || (block == m_Regions[0] && !m_Regions.Any(r => Polygon.Contains(r.Ring, f.Box.Center)))).ToList(),
                 };
 
                 var result = LayoutEngine.Run(request);
@@ -1404,6 +1564,22 @@ namespace BlockBuilder
                         var b = corners[(i + 1) % 4];
                         Line(new float3((float)a.X, y, (float)a.Y), new float3((float)b.X, y, (float)b.Y), placement.IsFixed ? closing : lot, placement.IsFixed ? 0.5f : 0.2f);
                     }
+                }
+
+                if (m_Moving != null)
+                {
+                    // The lot being dragged: green where it can be dropped, red where it cannot.
+                    var ghost = m_MoveOk ? new Color(0.49f, 0.95f, 0.55f, 0.95f) : new Color(1f, 0.35f, 0.3f, 0.95f);
+                    var corners = m_MoveGhost.Corners();
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var a = corners[i];
+                        var b = corners[(i + 1) % 4];
+                        Line(new float3((float)a.X, y, (float)a.Y), new float3((float)b.X, y, (float)b.Y), ghost, 0.6f);
+                    }
+
+                    var front = m_MoveGhost.Center + m_MoveGhost.Forward * (m_MoveGhost.Depth / 2);
+                    Line(new float3((float)m_MoveGhost.Center.X, y, (float)m_MoveGhost.Center.Y), new float3((float)front.X, y, (float)front.Y), ghost, 0.4f);
                 }
             }
 
