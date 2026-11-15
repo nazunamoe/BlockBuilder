@@ -55,11 +55,13 @@ namespace BlockBuilder.Core
         /// <summary>Move boundary edges that follow a road onto its curb line before planning.</summary>
         public bool SnapBoundaryToCurbs = true;
         /// <summary>
-        /// Metres a lot may overlap other lots and existing buildings at its sides and back (never
-        /// roads, never the area boundary, never in front). Needs the game's overlap error turned
-        /// off (Anarchy). 0 keeps lots strictly apart.
+        /// Metres a lot may overlap other lots and existing buildings at each side (left/right).
+        /// Never roads, never the area boundary. Needs the game's overlap error off (Anarchy).
         /// </summary>
-        public double OverlapAllowance;
+        public double OverlapSide;
+
+        /// <summary>Metres a lot may overlap others at its back (depth direction); the front stays flush with the road.</summary>
+        public double OverlapBack;
     }
 
     public sealed class LayoutRequest

@@ -28,7 +28,7 @@ namespace BlockBuilder.Core
             public List<Vec2> Poly;
             public LayoutOptions Options;
             public Random Rng;
-            /// <summary>Lots and buildings: may be overlapped by <see cref="LayoutOptions.OverlapAllowance"/>.</summary>
+            /// <summary>Lots and buildings: may be overlapped by the overlap allowances.</summary>
             public readonly List<Obb> Obstacles = new List<Obb>();
             /// <summary>Roads: never overlapped.</summary>
             public readonly List<Obb> Hard = new List<Obb>();
@@ -234,15 +234,16 @@ namespace BlockBuilder.Core
                 return false;
             }
 
-            double a = Math.Max(0, ctx.Options.OverlapAllowance);
-            if (a <= 0)
+            double side = Math.Max(0, ctx.Options.OverlapSide);
+            double back = Math.Max(0, ctx.Options.OverlapBack);
+            if (side <= 0 && back <= 0)
             {
                 return Clear(ctx.Obstacles, box);
             }
 
             // Shrink at the sides and the back only, so the front stays flush with the road.
-            double width = Math.Max(1, box.Width - 2 * a);
-            double depth = Math.Max(1, box.Depth - a);
+            double width = Math.Max(1, box.Width - 2 * side);
+            double depth = Math.Max(1, box.Depth - back);
             var inner = new Obb(box.Center + box.Forward * ((box.Depth - depth) / 2), box.Forward, width, depth);
             return Clear(ctx.Obstacles, inner);
         }
@@ -300,7 +301,7 @@ namespace BlockBuilder.Core
                     ctx.Result.Placements.Add(new Placement { ItemId = item.Id, Box = box, FrontageRoadId = front.RoadId, RoadIndex = front.RoadIndex });
                     Count(ctx, item.Id);
                     // With an overlap allowance the next lot may start that far inside this one.
-                    t += Math.Max(ctx.Options.Step / 2, item.Width - Math.Max(0, ctx.Options.OverlapAllowance));
+                    t += Math.Max(ctx.Options.Step / 2, item.Width - Math.Max(0, ctx.Options.OverlapSide));
                     placed = true;
                     break;
                 }

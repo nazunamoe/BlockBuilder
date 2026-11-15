@@ -247,3 +247,11 @@ $line: rgba(255, 255, 255, 0.12);
     flex-direction: column;
     pointer-events: auto;
 }
+
+.anarchyOn {
+    background-color: rgba(230, 90, 60, 0.75);
+
+    &:hover {
+        background-color: rgba(230, 90, 60, 0.9);
+    }
+}

@@ -41,8 +41,10 @@ namespace BlockBuilder
                 "지정할 항목", "영역을 닫은 뒤 Shift+클릭하면 이 항목을 가장 가까운 도로에 붙여 놓습니다. 지정한 항목 위에서 Shift+오른쪽 클릭하면 그 항목을 지웁니다 (빈 곳에서는 마지막 항목).");
             d[s.GetEnumValueLocaleID(FillMode.Fill)] = ko ? "채우기" : "Fill";
             d[s.GetEnumValueLocaleID(FillMode.FixedOnly)] = ko ? "지정만" : "Designated only";
-            Opt(nameof(Setting.OverlapAllowance), "Overlap allowance (m)", "Lots may overlap neighbours and existing buildings by this much at the sides and back (never roads or the front). Applied only while the Anarchy mod is switched on (its default ignores the overlap error then).",
-                "겹침 허용 (m)", "필지가 옆과 뒤쪽으로 이만큼 이웃 건물과 겹칠 수 있습니다 (도로와 앞면은 겹치지 않음). Anarchy 모드가 켜져 있을 때만 적용됩니다 (Anarchy 기본 설정이 그때 겹침 오류를 무시합니다).");
+            Opt(nameof(Setting.OverlapSide), "Overlap left/right (m)", "Lots may overlap neighbours and existing buildings by this much at each side. Never roads. Applied only while the Anarchy mod is on.",
+                "좌우 겹침 (m)", "필지가 양옆으로 이만큼 이웃 건물과 겹칠 수 있습니다. 도로와는 겹치지 않습니다. Anarchy 모드가 켜져 있을 때만 적용됩니다.");
+            Opt(nameof(Setting.OverlapBack), "Overlap front/back (m)", "Lots may overlap by this much at the back (the front stays on the road), e.g. back-to-back rows in a shallow block. Applied only while the Anarchy mod is on.",
+                "상하 겹침 (m)", "필지 뒤쪽이 이만큼 겹칠 수 있습니다 (앞면은 도로에 붙은 채). 얕은 블록에서 등을 맞댄 두 줄을 넣을 때 씁니다. Anarchy 모드가 켜져 있을 때만 적용됩니다.");
             Opt(nameof(Setting.GenerateRoads), "Generate streets", "Add internal streets so deep areas get road frontage. Street ends join existing roads they reach.",
                 "내부 도로 생성", "깊은 영역에도 건물이 도로에 접하도록 내부 도로를 추가합니다. 도로 끝은 닿는 기존 도로에 연결됩니다.");
             Opt(nameof(Setting.NewRoadName), "Street road type", "Road prefab name for generated streets (see catalog.tsv, type=road).",

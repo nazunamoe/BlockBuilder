@@ -121,9 +121,12 @@ namespace BlockBuilder
             m_ToolSystem.activeTool = this;
         }
 
-        /// <summary>Overlap allowance in effect: only while Anarchy is on (the game blocks overlaps otherwise).</summary>
-        internal static double EffectiveOverlap(Setting options) =>
-            options.OverlapAllowance > 0 && AnarchyLink.Enabled ? options.OverlapAllowance : 0;
+        /// <summary>Overlap allowances in effect: only while Anarchy is on (the game blocks overlaps otherwise).</summary>
+        internal static double EffectiveSide(Setting options) => options.OverlapSide > 0 && AnarchyLink.Enabled ? options.OverlapSide : 0;
+
+        internal static double EffectiveBack(Setting options) => options.OverlapBack > 0 && AnarchyLink.Enabled ? options.OverlapBack : 0;
+
+        private static bool WantsOverlap(Setting options) => options.OverlapSide > 0 || options.OverlapBack > 0;
 
         protected override void OnStartRunning()
         {
@@ -431,7 +434,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{EffectiveOverlap(options)}|{m_Fixed.Count}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{EffectiveSide(options)}|{EffectiveBack(options)}|{m_Fixed.Count}|{options.Revision}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -651,7 +654,8 @@ namespace BlockBuilder
                     FillInterior = options.FillInterior,
                     Seed = options.Seed,
                     Mode = options.PlacementMode,
-                    OverlapAllowance = EffectiveOverlap(options),
+                    OverlapSide = EffectiveSide(options),
+                    OverlapBack = EffectiveBack(options),
                 },
                 Fixed = m_Fixed.Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
             };
@@ -670,14 +674,14 @@ namespace BlockBuilder
                 Note("no lot fits; the area may not touch a road (draw over the road or enable streets)", "들어갈 필지가 없습니다. 영역이 도로에 닿는지 확인하거나 내부 도로 생성을 켜세요");
             }
 
-            if (options.OverlapAllowance > 0 && EffectiveOverlap(options) == 0 && m_Plan.Placements.Count > 0)
+            if (WantsOverlap(options) && !AnarchyLink.Enabled && m_Plan.Placements.Count > 0)
             {
                 Note(
                     AnarchyLink.Installed ? "overlap allowance needs Anarchy switched on; lots kept apart" : "overlap allowance needs the Anarchy mod; lots kept apart",
                     AnarchyLink.Installed ? "겹침 허용은 Anarchy를 켜야 적용됩니다. 지금은 겹치지 않게 배치했습니다" : "겹침 허용은 Anarchy 모드가 있어야 합니다. 지금은 겹치지 않게 배치했습니다");
             }
 
-            Mod.log.Info($"builder: plan overlap={EffectiveOverlap(options)} anarchy={AnarchyLink.Enabled} mode={options.PlacementMode} scope={options.Scope} checked={options.Checked.Count} palette='{palette.Name}' items={items.Count} existingRoadSegments={request.ExistingRoads.Count} existingBuildings={request.Obstacles.Count} -> buildings={m_Plan.Placements.Count} streets={m_Plan.Roads.Count} in {watch.ElapsedMilliseconds} ms");
+            Mod.log.Info($"builder: plan overlap={EffectiveSide(options)}/{EffectiveBack(options)} anarchy={AnarchyLink.Enabled} mode={options.PlacementMode} scope={options.Scope} checked={options.Checked.Count} palette='{palette.Name}' items={items.Count} existingRoadSegments={request.ExistingRoads.Count} existingBuildings={request.Obstacles.Count} -> buildings={m_Plan.Placements.Count} streets={m_Plan.Roads.Count} in {watch.ElapsedMilliseconds} ms");
             foreach (var w in m_Plan.Warnings)
             {
                 Mod.log.Info($"builder: warning: {w}");

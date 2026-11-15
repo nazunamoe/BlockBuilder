@@ -41,9 +41,13 @@ const T: Text = {
     snapCurb: ["Curbs and junction corners", "연석·교차로 모서리"],
     snapAngle: ["Parallel / perpendicular to roads", "도로와 평행·직각"],
     snapCell: ["Edge length in 8 m steps", "변 길이 8m 단위"],
-    overlap: ["Overlap allowance", "겹침 허용"],
-    overlapActive: ["Anarchy is on: lots may overlap at the sides and back.", "Anarchy 켜짐: 필지가 옆·뒤로 겹칠 수 있습니다."],
-    overlapAnarchyOff: ["Switch Anarchy on to use this; lots are kept apart now.", "Anarchy를 켜야 적용됩니다. 지금은 겹치지 않게 배치합니다."],
+    overlapTitle: ["Overlap (Anarchy)", "겹침 (Anarchy)"],
+    overlapSide: ["Left / right", "좌우"],
+    overlapBack: ["Front / back (back side only)", "상하 (뒤쪽만)"],
+    anarchyOn: ["Anarchy: ON", "Anarchy: 켜짐"],
+    anarchyOff: ["Anarchy: OFF", "Anarchy: 꺼짐"],
+    overlapActive: ["Anarchy is on: lots may overlap as set.", "Anarchy 켜짐: 설정한 만큼 겹칠 수 있습니다."],
+    overlapAnarchyOff: ["Switch Anarchy on to change these; lots are kept apart now.", "Anarchy를 켜야 값을 바꿀 수 있습니다. 지금은 겹치지 않게 배치합니다."],
     overlapNoAnarchy: ["Needs the Anarchy mod; lots are kept apart now.", "Anarchy 모드가 필요합니다. 지금은 겹치지 않게 배치합니다."],
     checkAll: ["All", "모두"],
     checkNone: ["None", "해제"],
@@ -211,21 +215,6 @@ export const BuilderPanel = () => {
 
                 <Section title={t("options")}>
                     <Toggle value={state.fillRest} onChange={actions.setFillRest} label={t("fillRest")} />
-                    <div className={styles.stepper}>
-                        <span>{t("overlap")}</span>
-                        <button className={styles.small} onClick={() => actions.setOverlap(state.overlap - 1)}>
-                            −
-                        </button>
-                        <b>{state.overlap} m</b>
-                        <button className={styles.small} onClick={() => actions.setOverlap(state.overlap + 1)}>
-                            +
-                        </button>
-                    </div>
-                    {state.overlap > 0 && (
-                        <div className={state.anarchyOn ? styles.meta : styles.warning}>
-                            {t(!state.anarchyInstalled ? "overlapNoAnarchy" : state.anarchyOn ? "overlapActive" : "overlapAnarchyOff")}
-                        </div>
-                    )}
                     <Toggle value={state.generateRoads} onChange={actions.setGenerateRoads} label={t("generateRoads")} />
                     {state.generateRoads && (
                         <>
@@ -245,6 +234,43 @@ export const BuilderPanel = () => {
                         </>
                     )}
                     <Toggle value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} />
+                </Section>
+
+                <Section
+                    title={t("overlapTitle")}
+                    extra={
+                        state.anarchyInstalled ? (
+                            <button className={`${styles.small} ${state.anarchyOn ? styles.anarchyOn : ""}`} onClick={actions.toggleAnarchy}>
+                                {t(state.anarchyOn ? "anarchyOn" : "anarchyOff")}
+                            </button>
+                        ) : undefined
+                    }
+                >
+                    <div className={styles.stepper}>
+                        <span>{t("overlapSide")}</span>
+                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapSide(state.overlapSide - 1)}>
+                            −
+                        </button>
+                        <b>{state.overlapSide} m</b>
+                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapSide(state.overlapSide + 1)}>
+                            +
+                        </button>
+                    </div>
+                    <div className={styles.stepper}>
+                        <span>{t("overlapBack")}</span>
+                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapBack(state.overlapBack - 1)}>
+                            −
+                        </button>
+                        <b>{state.overlapBack} m</b>
+                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapBack(state.overlapBack + 1)}>
+                            +
+                        </button>
+                    </div>
+                    {(!state.anarchyOn || state.overlapSide > 0 || state.overlapBack > 0) && (
+                        <div className={state.anarchyOn ? styles.meta : styles.warning}>
+                            {t(!state.anarchyInstalled ? "overlapNoAnarchy" : state.anarchyOn ? "overlapActive" : "overlapAnarchyOff")}
+                        </div>
+                    )}
                 </Section>
 
                 <div className={styles.footer}>

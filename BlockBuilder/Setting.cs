@@ -153,10 +153,15 @@ namespace BlockBuilder
         [SettingsUIHidden]
         public int SnapOff { get; set; }
 
-        /// <summary>Metres lots may overlap at the sides and back; applied only while Anarchy is on.</summary>
+        /// <summary>Metres lots may overlap at each side (left/right); applied only while Anarchy is on.</summary>
         [SettingsUISlider(min = 0, max = 8, step = 1)]
         [SettingsUISection(kBuilderTab, kBuildGroup)]
-        public int OverlapAllowance { get; set; }
+        public int OverlapSide { get; set; }
+
+        /// <summary>Metres lots may overlap at the back (front/back direction); applied only while Anarchy is on.</summary>
+        [SettingsUISlider(min = 0, max = 16, step = 1)]
+        [SettingsUISection(kBuilderTab, kBuildGroup)]
+        public int OverlapBack { get; set; }
 
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public bool GenerateRoads { get; set; }

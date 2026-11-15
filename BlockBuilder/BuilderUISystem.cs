@@ -80,10 +80,20 @@ namespace BlockBuilder
                     o.SnapOff ^= bit;
                 }
             })));
-            AddBinding(new TriggerBinding<int>(kGroup, "setOverlap", n => Edit(o => o.OverlapAllowance = System.Math.Max(0, System.Math.Min(8, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setOverlapSide", n => EditIfAnarchy(o => o.OverlapSide = System.Math.Max(0, System.Math.Min(8, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setOverlapBack", n => EditIfAnarchy(o => o.OverlapBack = System.Math.Max(0, System.Math.Min(16, n)))));
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
+        }
+
+        /// <summary>Overlap values only change while Anarchy is on (they have no effect otherwise).</summary>
+        private static void EditIfAnarchy(System.Action<Setting> change)
+        {
+            if (AnarchyLink.Enabled)
+            {
+                Edit(change);
+            }
         }
 
         private static void Edit(System.Action<Setting> change)
@@ -146,7 +156,8 @@ namespace BlockBuilder
             Prop(sb, "scope", o.Scope == ItemScope.Checked ? 1 : 0);
             Prop(sb, "fillRest", !o.PlacedOnly);
             Prop(sb, "snapOff", o.SnapOff);
-            Prop(sb, "overlap", o.OverlapAllowance);
+            Prop(sb, "overlapSide", o.OverlapSide);
+            Prop(sb, "overlapBack", o.OverlapBack);
             Prop(sb, "anarchyInstalled", AnarchyLink.Installed);
             Prop(sb, "anarchyOn", AnarchyLink.Enabled);
             Prop(sb, "generateRoads", o.GenerateRoads);

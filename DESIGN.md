@@ -109,11 +109,13 @@
   - `GetAnarchyToggleState()`: Anarchy가 켜져 있는지 확인한다.
 - Anarchy의 `DisableToolErrorsSystem`은 매 프레임 도구 종류와 상관없이, 허용된 오류 종류의 `ToolErrorData` 플래그를 바꿔 적용을 막지 않게 한다. 기본값은 `OverlapExisting`이 WithAnarchy(켜면 무시), `NoRoadAccess`가 Never(항상 검사)이다.
 - 겹친 건물 보호: Anarchy의 `AnarchyPlopSystem`은 `BuildingPrefab`에는 `PreventOverride`를 붙이지 않는다. 그래서 건물용으로 따로 할 일은 없다.
-- 엔진 `OverlapAllowance`:
+- 엔진 `OverlapSide`(좌우)와 `OverlapBack`(상하, 뒤쪽만):
   - 대상: 필지·지정 건물·기존 건물과만 겹칠 수 있고, 도로(`Hard`)와는 절대 겹치지 않는다.
-  - 방법: 겹침 검사 때 후보 필지를 옆은 양쪽 a씩, 뒤는 a만큼 줄인다. 앞면은 도로에 맞춘 채로 둔다.
-  - 도로를 따라 다음 필지를 놓는 간격은 폭 − a이다.
-- 설정 `OverlapAllowance`(0~8m, 기본 0)는 Anarchy가 켜져 있을 때만 엔진에 넘긴다. 꺼져 있으면 패널과 상태 문구로 알린다.
+  - 방법: 겹침 검사 때 후보 필지를 옆은 양쪽 side씩, 뒤는 back만큼 줄인다. 앞면은 도로에 맞춘 채로 둔다.
+  - 도로를 따라 다음 필지를 놓는 간격은 폭 − side이다.
+  - back은 얕은 블록에 등을 맞댄 두 줄을 넣을 때 쓴다(테스트 있음).
+- 설정 `OverlapSide`(0~8m)와 `OverlapBack`(0~16m)은 기본 0이며, Anarchy가 켜져 있을 때만 엔진에 넘긴다. 꺼져 있으면 패널과 상태 문구로 알린다.
+- 패널의 Anarchy 켜기/끄기 버튼은 Anarchy UI 트리거 `trigger("Anarchy", "AnarchyToggled")`를 부른다. 켜짐 상태는 C#에서 `GetAnarchyToggleState()`로 읽어 표시한다.
 
 ## 나중에 할 것 (엔진 쪽)
 - 게임이 보고한 오류 위치의 필지만 빼고 다시 미리보기 (지금은 오류가 하나라도 있으면 전체가 막힘)

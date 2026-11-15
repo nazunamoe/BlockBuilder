@@ -7,12 +7,12 @@ namespace BlockBuilder.Core.Tests
 {
     public class OverlapAllowanceTests
     {
-        private static LayoutRequest Row(double length, double allowance) => new LayoutRequest
+        private static LayoutRequest Row(double length, double side, double back = 0) => new LayoutRequest
         {
             Boundary = new List<Vec2> { new Vec2(0, 0), new Vec2(length, 0), new Vec2(length, 40), new Vec2(0, 40) },
             ExistingRoads = { new RoadSegment { A = new Vec2(-20, -8), B = new Vec2(length + 20, -8), Width = 16, Id = 1 } },
             Items = { new PaletteItem { Id = "house", Width = 24, Depth = 24, Weight = 1, RequiresRoad = true } },
-            Options = new LayoutOptions { OverlapAllowance = allowance },
+            Options = new LayoutOptions { OverlapSide = side, OverlapBack = back },
         };
 
         [Fact]
@@ -43,6 +43,37 @@ namespace BlockBuilder.Core.Tests
 
             // Fronts stay flush with the curb and lots stay inside the area.
             Assert.All(result.Placements, p => Assert.Equal(12, p.Box.Center.Y, 6));
+        }
+
+        [Fact]
+        public void BackOnly_DoesNotPackSideways()
+        {
+            // Back overlap alone keeps neighbours along the road apart.
+            var result = LayoutEngine.Run(Row(104, 0, 6));
+            Assert.Equal(4, result.Placements.Count);
+        }
+
+        [Fact]
+        public void BackOverlap_LetsBackToBackRowsShareDepth()
+        {
+            // 40 m deep strip between two roads: two 24 m rows need 48 m, so they only fit with 8 m back overlap.
+            LayoutRequest Strip(double back) => new LayoutRequest
+            {
+                Boundary = new List<Vec2> { new Vec2(0, 0), new Vec2(48, 0), new Vec2(48, 40), new Vec2(0, 40) },
+                ExistingRoads =
+                {
+                    new RoadSegment { A = new Vec2(-20, -8), B = new Vec2(68, -8), Width = 16, Id = 1 },
+                    new RoadSegment { A = new Vec2(-20, 48), B = new Vec2(68, 48), Width = 16, Id = 2 },
+                },
+                Items = { new PaletteItem { Id = "house", Width = 24, Depth = 24, Weight = 1, RequiresRoad = true } },
+                Options = new LayoutOptions { OverlapBack = back },
+            };
+
+            Assert.Equal(2, LayoutEngine.Run(Strip(0)).Placements.Count);
+            var result = LayoutEngine.Run(Strip(8));
+            Assert.Equal(4, result.Placements.Count);
+            Assert.Contains(result.Placements, p => p.FrontageRoadId == 1);
+            Assert.Contains(result.Placements, p => p.FrontageRoadId == 2);
         }
 
         [Fact]

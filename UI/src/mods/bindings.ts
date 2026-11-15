@@ -15,7 +15,8 @@ export interface BuilderState {
     scope: number;
     fillRest: boolean;
     snapOff: number;
-    overlap: number;
+    overlapSide: number;
+    overlapBack: number;
     anarchyInstalled: boolean;
     anarchyOn: boolean;
     generateRoads: boolean;
@@ -65,7 +66,8 @@ const emptyState: BuilderState = {
     scope: 0,
     fillRest: true,
     snapOff: 0,
-    overlap: 0,
+    overlapSide: 0,
+    overlapBack: 0,
     anarchyInstalled: false,
     anarchyOn: false,
     generateRoads: false,
@@ -106,7 +108,10 @@ export const actions = {
     toggleChecked: (i: number) => trigger(GROUP, "toggleChecked", i),
     checkAll: (b: boolean) => trigger(GROUP, "checkAll", b),
     toggleSnap: (bit: number) => trigger(GROUP, "toggleSnap", bit),
-    setOverlap: (n: number) => trigger(GROUP, "setOverlap", n),
+    setOverlapSide: (n: number) => trigger(GROUP, "setOverlapSide", n),
+    setOverlapBack: (n: number) => trigger(GROUP, "setOverlapBack", n),
+    /** Anarchy's own UI trigger (group "Anarchy"); only call when Anarchy is installed. */
+    toggleAnarchy: () => trigger("Anarchy", "AnarchyToggled"),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
     setFillInterior: (b: boolean) => trigger(GROUP, "setFillInterior", b),
     setBlockLength: (n: number) => trigger(GROUP, "setBlockLength", n),
