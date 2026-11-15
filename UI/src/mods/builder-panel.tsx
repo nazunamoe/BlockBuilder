@@ -1,11 +1,10 @@
 import { useValue } from "cs2/api";
 import { getModule } from "cs2/modding";
-import { Panel, Scrollable } from "cs2/ui";
-import { ReactNode } from "react";
+import { Scrollable } from "cs2/ui";
+import { useState } from "react";
 import { actions, BuilderState, listsBinding, parseLists, parseState, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
+import { Check, loadJson, saveJson, Section, Segmented, Stepper, Switch, useDraggable } from "mods/ui-parts";
 import styles from "./builder-panel.module.scss";
-
-type Text = { [key: string]: [string, string] };
 
 /** The game's own tool options toolbar (snapping buttons), shown inside the builder panel. */
 const MouseToolOptions: any = (() => {
@@ -16,99 +15,109 @@ const MouseToolOptions: any = (() => {
     }
 })();
 
+const PANEL_WIDTH = 380;
+const POS_KEY = "blockBuilder.panelPos";
+const OPEN_KEY = "blockBuilder.sections";
+const DEFAULT_POS = { x: 12, y: 120 };
+const DEFAULT_OPEN: { [id: string]: boolean } = { list: true, items: true, snap: false, options: true, overlap: false };
+
 // [English, Korean]
-const T: Text = {
-    drawStart: ["Click corners to draw the area. Yellow marker: snapped to a curb, junction or road angle.", "꼭짓점을 클릭해 영역을 그리세요. 노란 표시는 연석·교차로·도로 각도에 맞춰진 위치입니다."],
-    drawMore: ["Click the first corner to close the area.", "첫 꼭짓점을 클릭하면 영역이 닫힙니다."],
-    planned: ["Left click: build. Right click: back. Shift+click: designate.", "왼쪽 클릭: 짓기 · 오른쪽 클릭: 되돌리기 · Shift+클릭: 지정"],
+const T: { [key: string]: [string, string] } = {
+    stepDraw: ["Draw", "영역 그리기"],
+    stepPreview: ["Preview", "미리보기"],
+    stepBuild: ["Build", "짓기"],
+    drawStart: ["Click corners on the map. The yellow marker shows where a corner snaps.", "지도에서 꼭짓점을 찍으세요. 노란 표시는 맞춰질 위치입니다."],
+    drawMore: ["Keep adding corners; click the first one to close the area.", "꼭짓점을 계속 찍고, 첫 꼭짓점을 누르면 영역이 닫힙니다."],
+    plannedHint: ["Left click builds · Right click goes back · Shift+click places the selected building", "왼쪽 클릭 짓기 · 오른쪽 클릭 되돌리기 · Shift+클릭 선택한 건물 놓기"],
     corners: ["corners", "꼭짓점"],
-    buildings: ["buildings", "건물"],
-    streets: ["streets", "도로"],
-    designated: ["designated", "지정"],
+    buildings: ["Buildings", "건물"],
+    streets: ["Streets", "도로"],
+    designated: ["Placed", "직접 놓음"],
     list: ["Placement list", "배치 리스트"],
     reload: ["Reload", "다시 읽기"],
     noLists: ["No lists yet. Make one in Options > Block Builder.", "리스트가 없습니다. 옵션 > Block Builder에서 만드세요."],
-    scope: ["Fill with", "채울 건물"],
     scopeAll: ["Whole list", "리스트 전체"],
     scopeChecked: ["Checked only", "고른 항목만"],
     items: ["Buildings", "건물 목록"],
-    itemsHint: ["Click a name, then Shift+click on the map to place it there.", "이름을 클릭한 뒤 지도에서 Shift+클릭하면 그 자리에 놓습니다."],
-    itemsHintChecked: [
-        "Check the buildings to fill with. Click a name, then Shift+click on the map to place it there.",
-        "채울 건물을 체크하세요. 이름을 클릭한 뒤 지도에서 Shift+클릭하면 그 자리에 놓습니다.",
-    ],
+    itemsHint: ["Click a name, then Shift+click on the map to place it.", "이름을 고른 뒤 지도에서 Shift+클릭하면 그 자리에 놓습니다."],
+    itemsHintChecked: ["Tick the buildings to fill with. Click a name, then Shift+click to place it.", "채울 건물을 체크하세요. 이름을 고른 뒤 Shift+클릭하면 그 자리에 놓습니다."],
+    selected: ["Shift+click", "Shift+클릭"],
+    checkAll: ["All", "모두"],
+    checkNone: ["None", "해제"],
+    notLoaded: ["missing", "없음"],
     snap: ["Corner snapping", "꼭짓점 맞춤"],
     snapCurb: ["Curbs and junction corners", "연석·교차로 모서리"],
     snapAngle: ["Parallel / perpendicular to roads", "도로와 평행·직각"],
     snapCell: ["Edge length in 8 m steps", "변 길이 8m 단위"],
-    overlapTitle: ["Overlap (Anarchy)", "겹침 (Anarchy)"],
-    overlapSide: ["Left / right", "좌우"],
-    overlapBack: ["Front / back (back side only)", "상하 (뒤쪽만)"],
-    anarchyOn: ["Anarchy: ON", "Anarchy: 켜짐"],
-    anarchyOff: ["Anarchy: OFF", "Anarchy: 꺼짐"],
-    overlapActive: ["Anarchy is on: lots may overlap as set.", "Anarchy 켜짐: 설정한 만큼 겹칠 수 있습니다."],
-    overlapAnarchyOff: ["Switch Anarchy on to change these; lots are kept apart now.", "Anarchy를 켜야 값을 바꿀 수 있습니다. 지금은 겹치지 않게 배치합니다."],
-    overlapNoAnarchy: ["Needs the Anarchy mod; lots are kept apart now.", "Anarchy 모드가 필요합니다. 지금은 겹치지 않게 배치합니다."],
-    checkAll: ["All", "모두"],
-    checkNone: ["None", "해제"],
-    fillRest: ["Fill the rest (off: only Shift+clicked)", "빈자리 채우기 (끄면 Shift+클릭한 것만 짓기)"],
-    notLoaded: ["not loaded", "없음"],
     options: ["Options", "옵션"],
+    fillRest: ["Fill the rest", "빈자리 채우기"],
+    fillRestHint: ["Off: build only Shift+clicked buildings", "끄면 Shift+클릭한 건물만 짓습니다"],
     generateRoads: ["Generate streets", "내부 도로 생성"],
-    fillInterior: ["Fill interior", "내부 채우기"],
+    generateRoadsHint: ["For deep areas; ends join existing roads", "깊은 영역용, 끝은 기존 도로에 연결"],
     blockLength: ["Max block length", "최대 블록 길이"],
     roadType: ["Street type", "도로 종류"],
+    fillInterior: ["Fill interior", "내부 채우기"],
+    fillInteriorHint: ["Items that need no road (plazas, statues)", "도로가 필요 없는 항목 (광장, 조형물)"],
+    overlap: ["Overlap", "겹침"],
+    overlapSide: ["Left / right", "좌우"],
+    overlapBack: ["Back", "상하 (뒤쪽)"],
+    anarchyOn: ["Anarchy ON", "Anarchy 켜짐"],
+    anarchyOff: ["Anarchy OFF", "Anarchy 꺼짐"],
+    overlapActive: ["Lots may overlap neighbours by these amounts. Never roads or the front.", "설정한 만큼 이웃과 겹칠 수 있습니다. 도로와 앞면은 겹치지 않습니다."],
+    overlapAnarchyOff: ["Switch Anarchy on to change these. Lots are kept apart now.", "Anarchy를 켜야 바꿀 수 있습니다. 지금은 겹치지 않게 배치합니다."],
+    overlapNoAnarchy: ["Needs the Anarchy mod. Lots are kept apart now.", "Anarchy 모드가 필요합니다. 지금은 겹치지 않게 배치합니다."],
     shuffle: ["Shuffle", "배치 섞기"],
     clear: ["Clear area", "영역 지우기"],
+    resetPos: ["Reset position", "위치 초기화"],
     close: ["Close", "닫기"],
 };
 
-const Section = ({ title, children, extra }: { title: string; children: ReactNode; extra?: ReactNode }) => (
-    <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-            <span>{title}</span>
-            {extra}
-        </div>
-        {children}
-    </div>
-);
-
-const Choice = ({ selected, onClick, children, dim }: { selected: boolean; onClick: () => void; children: ReactNode; dim?: boolean }) => (
-    <button className={`${styles.choice} ${selected ? styles.selected : ""} ${dim ? styles.dim : ""}`} onClick={onClick}>
-        {children}
-    </button>
-);
-
-const Toggle = ({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) => (
-    <button className={`${styles.toggle} ${value ? styles.on : ""}`} onClick={() => onChange(!value)}>
-        <span className={styles.box}>{value ? "✓" : ""}</span>
-        {label}
-    </button>
-);
-
-function Hint({ state, t }: { state: BuilderState; t: (k: string) => string }) {
-    if (!state.planned) {
-        return (
-            <div className={styles.hint}>
-                {state.corners === 0 ? t("drawStart") : `${t("drawMore")} (${state.corners} ${t("corners")})`}
-            </div>
-        );
-    }
-
+function Steps({ state, t }: { state: BuilderState; t: (k: string) => string }) {
+    const current = state.planned ? 1 : 0;
+    const steps = [t("stepDraw"), t("stepPreview"), t("stepBuild")];
     return (
-        <div className={styles.hint}>
-            <div className={styles.stats}>
-                <span>
-                    {t("buildings")} <b>{state.buildings}</b>
-                </span>
-                <span>
-                    {t("streets")} <b>{state.streets}</b>
-                </span>
-                <span>
-                    {t("designated")} <b>{state.designated}</b>
-                </span>
-            </div>
-            <div>{t("planned")}</div>
+        <div className={styles.steps}>
+            {steps.map((s, i) => (
+                <div key={i} className={`${styles.stepChip} ${i === current ? styles.stepCurrent : i < current ? styles.stepDone : ""}`}>
+                    <span className={styles.stepNumber}>{i + 1}</span>
+                    {s}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function StatusCard({ state, t }: { state: BuilderState; t: (k: string) => string }) {
+    return (
+        <div className={styles.card}>
+            <Steps state={state} t={t} />
+            {state.planned ? (
+                <>
+                    <div className={styles.stats}>
+                        <div className={styles.stat}>
+                            <b>{state.buildings}</b>
+                            <span>{t("buildings")}</span>
+                        </div>
+                        <div className={styles.stat}>
+                            <b>{state.streets}</b>
+                            <span>{t("streets")}</span>
+                        </div>
+                        <div className={styles.stat}>
+                            <b>{state.designated}</b>
+                            <span>{t("designated")}</span>
+                        </div>
+                    </div>
+                    <div className={styles.hint}>{t("plannedHint")}</div>
+                </>
+            ) : (
+                <div className={styles.hint}>{state.corners === 0 ? t("drawStart") : `${t("drawMore")} (${state.corners} ${t("corners")})`}</div>
+            )}
+            {state.status !== "" && <div className={styles.status}>{state.status}</div>}
+            {state.warnings.map((w, i) => (
+                <div key={i} className={styles.warning}>
+                    {w}
+                </div>
+            ))}
         </div>
     );
 }
@@ -116,27 +125,43 @@ function Hint({ state, t }: { state: BuilderState; t: (k: string) => string }) {
 export const BuilderPanel = () => {
     const state = parseState(useValue(stateBinding));
     const lists = parseLists(useValue(listsBinding));
+    const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, { width: PANEL_WIDTH, height: 600 });
+    const [open, setOpen] = useState<{ [id: string]: boolean }>(() => loadJson(OPEN_KEY, DEFAULT_OPEN));
     if (!state.active) {
         return null;
     }
 
     const t = (k: string) => (T[k] ? T[k][state.ko ? 1 : 0] : k);
+    const toggleSection = (id: string) => {
+        const next = { ...open, [id]: !open[id] };
+        setOpen(next);
+        saveJson(OPEN_KEY, next);
+    };
+    const bodyMaxHeight = Math.max(240, window.innerHeight - pos.y - 120);
+    const checkedScope = state.scope === 1;
 
     return (
-        <div className={styles.anchor}>
-            <Panel header="Block Builder" className={styles.panel} onClose={actions.toggle}>
-                <Hint state={state} t={t} />
-                {state.status !== "" && <div className={styles.status}>{state.status}</div>}
-                {state.warnings.map((w, i) => (
-                    <div key={i} className={styles.warning}>
-                        {w}
-                    </div>
-                ))}
+        <div className={styles.window} style={{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${PANEL_WIDTH}rem` }}>
+            <div className={styles.titleBar} onMouseDown={onHandleDown}>
+                <span className={styles.title}>Block Builder</span>
+                <button className={styles.iconButton} title={t("resetPos")} onMouseDown={(e) => e.stopPropagation()} onClick={reset}>
+                    <img className={styles.glyph} src="Media/Glyphs/ArrowCircular.svg" />
+                </button>
+                <button className={styles.iconButton} title={t("close")} onMouseDown={(e) => e.stopPropagation()} onClick={actions.toggle}>
+                    <img className={styles.glyph} src="Media/Glyphs/Close.svg" />
+                </button>
+            </div>
+
+            <Scrollable className={styles.body} style={{ maxHeight: `${bodyMaxHeight}px` }} vertical>
+                <StatusCard state={state} t={t} />
 
                 <Section
+                    id="list"
                     title={t("list")}
+                    open={open.list}
+                    onToggle={toggleSection}
                     extra={
-                        <button className={styles.small} onClick={actions.reloadLists}>
+                        <button className={styles.chip} onClick={actions.reloadLists}>
                             {t("reload")}
                         </button>
                     }
@@ -144,147 +169,118 @@ export const BuilderPanel = () => {
                     {lists.palettes.length === 0 ? (
                         <div className={styles.empty}>{t("noLists")}</div>
                     ) : (
-                        <Scrollable className={styles.listShort} vertical>
+                        <div className={styles.paletteList}>
                             {lists.palettes.map((p, i) => (
-                                <Choice key={i} selected={i === state.palette} onClick={() => actions.setPalette(i)}>
+                                <button key={i} className={`${styles.row} ${i === state.palette ? styles.rowOn : ""}`} onClick={() => actions.setPalette(i)}>
                                     <span className={styles.name}>{p.name}</span>
-                                    <span className={styles.meta}>{p.count}</span>
-                                </Choice>
+                                    <span className={styles.badge}>{p.count}</span>
+                                </button>
                             ))}
-                        </Scrollable>
+                        </div>
                     )}
-                </Section>
-
-                <Section title={t("scope")}>
-                    <div className={styles.row}>
-                        <Choice selected={state.scope === 0} onClick={() => actions.setScope(0)}>
-                            {t("scopeAll")}
-                        </Choice>
-                        <Choice selected={state.scope === 1} onClick={() => actions.setScope(1)}>
-                            {`${t("scopeChecked")} (${lists.checkedCount})`}
-                        </Choice>
-                    </div>
+                    <Segmented
+                        value={state.scope}
+                        onChange={actions.setScope}
+                        options={[
+                            { value: 0, label: t("scopeAll") },
+                            { value: 1, label: `${t("scopeChecked")} · ${lists.checkedCount}` },
+                        ]}
+                    />
                 </Section>
 
                 <Section
-                    title={t("items")}
+                    id="items"
+                    title={`${t("items")} (${lists.entries.length})`}
+                    open={open.items}
+                    onToggle={toggleSection}
                     extra={
-                        state.scope === 1 ? (
-                            <span>
-                                <button className={styles.small} onClick={() => actions.checkAll(true)}>
+                        checkedScope ? (
+                            <>
+                                <button className={styles.chip} onClick={() => actions.checkAll(true)}>
                                     {t("checkAll")}
-                                </button>{" "}
-                                <button className={styles.small} onClick={() => actions.checkAll(false)}>
+                                </button>
+                                <button className={styles.chip} onClick={() => actions.checkAll(false)}>
                                     {t("checkNone")}
                                 </button>
-                            </span>
+                            </>
                         ) : undefined
                     }
                 >
-                    <div className={styles.meta}>{t(state.scope === 1 ? "itemsHintChecked" : "itemsHint")}</div>
-                    <Scrollable className={styles.listTall} vertical>
-                        {lists.entries.map((e, i) => (
-                            <div key={i} className={styles.itemRow}>
-                                {state.scope === 1 && (
-                                    <button className={`${styles.check} ${e.checked ? styles.on : ""}`} onClick={() => actions.toggleChecked(i)}>
-                                        <span className={styles.box}>{e.checked ? "✓" : ""}</span>
+                    <div className={styles.note}>{t(checkedScope ? "itemsHintChecked" : "itemsHint")}</div>
+                    <Scrollable className={styles.itemList} vertical>
+                        {lists.entries.map((e, i) => {
+                            const selected = i === state.designate;
+                            return (
+                                <div key={i} className={`${styles.itemRow} ${selected ? styles.rowOn : ""} ${e.loaded ? "" : styles.dim}`}>
+                                    {checkedScope && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
+                                    <button className={styles.itemName} onClick={() => actions.setDesignate(i)}>
+                                        <span className={styles.name}>{e.name}</span>
+                                        {selected && <span className={styles.tag}>{t("selected")}</span>}
+                                        <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
                                     </button>
-                                )}
-                                <Choice selected={i === state.designate} dim={!e.loaded} onClick={() => actions.setDesignate(i)}>
-                                    <span className={styles.name}>{e.name}</span>
-                                    <span className={styles.meta}>{e.loaded ? e.size : t("notLoaded")}</span>
-                                </Choice>
-                            </div>
-                        ))}
+                                </div>
+                            );
+                        })}
                     </Scrollable>
                 </Section>
 
-                <Section title={t("snap")}>
+                <Section id="snap" title={t("snap")} open={open.snap} onToggle={toggleSection}>
                     {MouseToolOptions ? (
                         <div className={styles.toolOptions}>
                             <MouseToolOptions />
                         </div>
                     ) : (
                         <>
-                    <Toggle value={(state.snapOff & SNAP_CURB) === 0} onChange={() => actions.toggleSnap(SNAP_CURB)} label={t("snapCurb")} />
-                    <Toggle value={(state.snapOff & SNAP_ANGLE) === 0} onChange={() => actions.toggleSnap(SNAP_ANGLE)} label={t("snapAngle")} />
-                    <Toggle value={(state.snapOff & SNAP_CELL) === 0} onChange={() => actions.toggleSnap(SNAP_CELL)} label={t("snapCell")} />
+                            <Switch value={(state.snapOff & SNAP_CURB) === 0} onChange={() => actions.toggleSnap(SNAP_CURB)} label={t("snapCurb")} />
+                            <Switch value={(state.snapOff & SNAP_ANGLE) === 0} onChange={() => actions.toggleSnap(SNAP_ANGLE)} label={t("snapAngle")} />
+                            <Switch value={(state.snapOff & SNAP_CELL) === 0} onChange={() => actions.toggleSnap(SNAP_CELL)} label={t("snapCell")} />
                         </>
                     )}
                 </Section>
 
-                <Section title={t("options")}>
-                    <Toggle value={state.fillRest} onChange={actions.setFillRest} label={t("fillRest")} />
-                    <Toggle value={state.generateRoads} onChange={actions.setGenerateRoads} label={t("generateRoads")} />
+                <Section id="options" title={t("options")} open={open.options} onToggle={toggleSection}>
+                    <Switch value={state.fillRest} onChange={actions.setFillRest} label={t("fillRest")} hint={t("fillRestHint")} />
+                    <Switch value={state.generateRoads} onChange={actions.setGenerateRoads} label={t("generateRoads")} hint={t("generateRoadsHint")} />
                     {state.generateRoads && (
-                        <>
-                            <div className={styles.stepper}>
-                                <span>{t("blockLength")}</span>
-                                <button className={styles.small} onClick={() => actions.setBlockLength(state.blockLength - 16)}>
-                                    −
-                                </button>
-                                <b>{state.blockLength} m</b>
-                                <button className={styles.small} onClick={() => actions.setBlockLength(state.blockLength + 16)}>
-                                    +
-                                </button>
-                            </div>
-                            <div className={styles.meta}>
+                        <div className={styles.indent}>
+                            <Stepper label={t("blockLength")} value={state.blockLength} unit="m" step={16} onChange={actions.setBlockLength} />
+                            <div className={styles.note}>
                                 {t("roadType")}: {state.road}
                             </div>
-                        </>
+                        </div>
                     )}
-                    <Toggle value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} />
+                    <Switch value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} hint={t("fillInteriorHint")} />
                 </Section>
 
                 <Section
-                    title={t("overlapTitle")}
+                    id="overlap"
+                    title={t("overlap")}
+                    open={open.overlap}
+                    onToggle={toggleSection}
                     extra={
                         state.anarchyInstalled ? (
-                            <button className={`${styles.small} ${state.anarchyOn ? styles.anarchyOn : ""}`} onClick={actions.toggleAnarchy}>
+                            <button className={`${styles.chip} ${state.anarchyOn ? styles.chipDanger : ""}`} onClick={actions.toggleAnarchy}>
                                 {t(state.anarchyOn ? "anarchyOn" : "anarchyOff")}
                             </button>
                         ) : undefined
                     }
                 >
-                    <div className={styles.stepper}>
-                        <span>{t("overlapSide")}</span>
-                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapSide(state.overlapSide - 1)}>
-                            −
-                        </button>
-                        <b>{state.overlapSide} m</b>
-                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapSide(state.overlapSide + 1)}>
-                            +
-                        </button>
+                    <Stepper label={t("overlapSide")} value={state.overlapSide} unit="m" step={1} onChange={actions.setOverlapSide} disabled={!state.anarchyOn} />
+                    <Stepper label={t("overlapBack")} value={state.overlapBack} unit="m" step={1} onChange={actions.setOverlapBack} disabled={!state.anarchyOn} />
+                    <div className={state.anarchyOn ? styles.note : styles.warning}>
+                        {t(!state.anarchyInstalled ? "overlapNoAnarchy" : state.anarchyOn ? "overlapActive" : "overlapAnarchyOff")}
                     </div>
-                    <div className={styles.stepper}>
-                        <span>{t("overlapBack")}</span>
-                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapBack(state.overlapBack - 1)}>
-                            −
-                        </button>
-                        <b>{state.overlapBack} m</b>
-                        <button className={styles.small} disabled={!state.anarchyOn} onClick={() => actions.setOverlapBack(state.overlapBack + 1)}>
-                            +
-                        </button>
-                    </div>
-                    {(!state.anarchyOn || state.overlapSide > 0 || state.overlapBack > 0) && (
-                        <div className={state.anarchyOn ? styles.meta : styles.warning}>
-                            {t(!state.anarchyInstalled ? "overlapNoAnarchy" : state.anarchyOn ? "overlapActive" : "overlapAnarchyOff")}
-                        </div>
-                    )}
                 </Section>
+            </Scrollable>
 
-                <div className={styles.footer}>
-                    <button className={styles.action} onClick={actions.shuffle}>
-                        {t("shuffle")}
-                    </button>
-                    <button className={styles.action} onClick={actions.clearArea}>
-                        {t("clear")}
-                    </button>
-                    <button className={styles.action} onClick={actions.toggle}>
-                        {t("close")}
-                    </button>
-                </div>
-            </Panel>
+            <div className={styles.footer}>
+                <button className={`${styles.button} ${styles.primary}`} onClick={actions.shuffle}>
+                    {t("shuffle")}
+                </button>
+                <button className={styles.button} onClick={actions.clearArea}>
+                    {t("clear")}
+                </button>
+            </div>
         </div>
     );
 };

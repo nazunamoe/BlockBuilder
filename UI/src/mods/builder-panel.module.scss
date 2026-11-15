@@ -1,243 +1,540 @@
-// Panel anchored under the top-left toolbar. Colours follow the game's dark translucent panels.
-$accent: rgba(75, 170, 255, 1);
+// Builder window. Dark translucent surfaces and a blue accent in line with the game's own panels.
+$bg: rgba(24, 33, 51, 0.94);
+$surface: rgba(255, 255, 255, 0.05);
+$surface-hover: rgba(255, 255, 255, 0.1);
+$line: rgba(255, 255, 255, 0.1);
 $text: rgba(255, 255, 255, 0.92);
-$muted: rgba(255, 255, 255, 0.6);
-$line: rgba(255, 255, 255, 0.12);
+$muted: rgba(255, 255, 255, 0.58);
+$accent: rgba(83, 170, 255, 1);
+$accent-soft: rgba(83, 170, 255, 0.28);
+$warn: rgba(255, 192, 92, 1);
+$danger: rgba(232, 96, 72, 1);
+$radius: 6rem;
 
-.anchor {
+.window {
     position: absolute;
-    top: 120rem;
-    left: 10rem;
-    pointer-events: auto;
-}
-
-.panel {
-    width: 340rem;
-    pointer-events: auto;
-}
-
-.hint {
+    display: flex;
+    flex-direction: column;
+    background-color: $bg;
+    border: 1rem solid rgba(255, 255, 255, 0.12);
+    border-radius: 10rem;
+    box-shadow: 0 8rem 24rem rgba(0, 0, 0, 0.45);
     color: $text;
-    font-size: 13rem;
-    padding: 6rem 8rem;
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+// ---- Title bar (drag handle) ----
+
+.titleBar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8rem 8rem 8rem 12rem;
     background-color: rgba(255, 255, 255, 0.06);
-    border-radius: 4rem;
-    margin-bottom: 6rem;
+    border-bottom: 1rem solid $line;
+    cursor: move;
+}
+
+.grip {
+    color: $muted;
+    font-size: 12rem;
+    margin-right: 8rem;
+    letter-spacing: -2rem;
+}
+
+.title {
+    flex: 1;
+    font-size: 15rem;
+    font-weight: bold;
+    letter-spacing: 0.5rem;
+}
+
+.iconButton {
+    width: 26rem;
+    height: 26rem;
+    margin-left: 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: $muted;
+    font-size: 14rem;
+    background-color: transparent;
+    border: none;
+    border-radius: $radius;
+    cursor: pointer;
+
+    &:hover {
+        color: $text;
+        background-color: $surface-hover;
+    }
+}
+
+// ---- Body ----
+
+.body {
+    padding: 10rem 12rem 4rem 12rem;
+}
+
+.card {
+    padding: 10rem;
+    margin-bottom: 8rem;
+    background-color: $surface;
+    border-radius: 8rem;
+}
+
+.steps {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 8rem;
+}
+
+.stepChip {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 4rem 6rem;
+    margin-right: 4rem;
+    color: $muted;
+    font-size: 12rem;
+    border-radius: 20rem;
+    background-color: rgba(255, 255, 255, 0.04);
+
+    &:last-child {
+        margin-right: 0;
+    }
+}
+
+.stepNumber {
+    width: 16rem;
+    height: 16rem;
+    margin-right: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10rem;
+    border-radius: 8rem;
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.stepCurrent {
+    color: $text;
+    background-color: $accent-soft;
+
+    .stepNumber {
+        background-color: $accent;
+    }
+}
+
+.stepDone {
+    color: $text;
 }
 
 .stats {
     display: flex;
     flex-direction: row;
-    margin-bottom: 4rem;
+    margin-bottom: 6rem;
+}
+
+.stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4rem 0;
+
+    b {
+        font-size: 20rem;
+        color: $text;
+    }
 
     span {
-        margin-right: 12rem;
+        font-size: 11rem;
+        color: $muted;
     }
 }
 
-.status {
-    color: $accent;
+.hint {
+    color: $muted;
     font-size: 12rem;
-    padding: 2rem 8rem 6rem 8rem;
+    line-height: 1.4;
+}
+
+.status {
+    margin-top: 8rem;
+    padding: 5rem 8rem;
+    color: $text;
+    font-size: 12rem;
+    border-left: 3rem solid $accent;
+    background-color: rgba(83, 170, 255, 0.1);
+    border-radius: 0 $radius $radius 0;
 }
 
 .warning {
-    color: rgba(255, 190, 80, 1);
+    margin-top: 6rem;
+    padding: 5rem 8rem;
+    color: $warn;
     font-size: 12rem;
-    padding: 0 8rem 4rem 8rem;
+    border-left: 3rem solid $warn;
+    background-color: rgba(255, 192, 92, 0.08);
+    border-radius: 0 $radius $radius 0;
 }
 
+.note {
+    color: $muted;
+    font-size: 12rem;
+    margin: 2rem 0 6rem 0;
+}
+
+.empty {
+    color: $muted;
+    font-size: 12rem;
+    padding: 6rem 0;
+}
+
+// ---- Sections ----
+
 .section {
-    margin-top: 8rem;
-    padding-top: 6rem;
     border-top: 1rem solid $line;
+    padding: 4rem 0 8rem 0;
+}
+
+.collapsed {
+    padding-bottom: 4rem;
 }
 
 .sectionHeader {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
     align-items: center;
+}
+
+.sectionTitle {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 6rem 0;
+    color: $text;
+    font-size: 13rem;
+    font-weight: bold;
+    text-align: left;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+
+    &:hover {
+        color: $accent;
+    }
+}
+
+.chevron {
+    width: 10rem;
+    height: 10rem;
+    margin-right: 6rem;
+    opacity: 0.7;
+}
+
+.chevronClosed {
+    transform: rotate(-90deg);
+}
+
+.glyph {
+    width: 14rem;
+    height: 14rem;
+}
+
+.glyphSmall {
+    width: 11rem;
+    height: 11rem;
+}
+
+.sectionExtra {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.sectionBody {
+    padding-top: 2rem;
+}
+
+// ---- Controls ----
+
+.chip {
+    padding: 3rem 9rem;
+    margin-left: 4rem;
+    color: $text;
+    font-size: 11rem;
+    background-color: $surface-hover;
+    border: none;
+    border-radius: 20rem;
+    cursor: pointer;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.18);
+    }
+}
+
+.chipDanger {
+    background-color: rgba(232, 96, 72, 0.8);
+
+    &:hover {
+        background-color: $danger;
+    }
+}
+
+.segmented {
+    display: flex;
+    flex-direction: row;
+    margin-top: 8rem;
+    padding: 3rem;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 8rem;
+}
+
+.segment {
+    flex: 1;
+    padding: 5rem 6rem;
     color: $muted;
     font-size: 12rem;
-    text-transform: uppercase;
-    margin-bottom: 4rem;
+    background-color: transparent;
+    border: none;
+    border-radius: $radius;
+    cursor: pointer;
+
+    &:hover {
+        color: $text;
+    }
+}
+
+.segmentOn {
+    color: $text;
+    background-color: $accent-soft;
+}
+
+.paletteList {
+    display: flex;
+    flex-direction: column;
 }
 
 .row {
     display: flex;
     flex-direction: row;
-
-    .choice {
-        flex: 1;
-        justify-content: center;
-        margin-right: 4rem;
-    }
-}
-
-.listShort {
-    max-height: 110rem;
-}
-
-.listTall {
-    max-height: 170rem;
-}
-
-.choice {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 4rem 8rem;
+    padding: 6rem 8rem;
     margin-bottom: 2rem;
     color: $text;
     font-size: 13rem;
-    background-color: rgba(255, 255, 255, 0.04);
+    text-align: left;
+    background-color: $surface;
     border: none;
-    border-radius: 3rem;
+    border-left: 3rem solid transparent;
+    border-radius: $radius;
+    cursor: pointer;
 
     &:hover {
-        background-color: rgba(255, 255, 255, 0.12);
+        background-color: $surface-hover;
     }
 }
 
-.selected {
-    background-color: rgba(75, 170, 255, 0.35);
+.rowOn {
+    background-color: $accent-soft;
+    border-left-color: $accent;
 
     &:hover {
-        background-color: rgba(75, 170, 255, 0.45);
+        background-color: rgba(83, 170, 255, 0.36);
     }
+}
+
+.itemList {
+    max-height: 200rem;
 }
 
 .itemRow {
     display: flex;
     flex-direction: row;
     align-items: center;
+    padding-left: 4rem;
+    margin-bottom: 2rem;
+    background-color: $surface;
+    border-left: 3rem solid transparent;
+    border-radius: $radius;
 
-    .choice {
-        flex: 1;
+    &:hover {
+        background-color: $surface-hover;
     }
 }
 
-.check {
-    padding: 2rem 6rem 2rem 2rem;
+.itemName {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 5rem 8rem 5rem 4rem;
+    color: $text;
+    font-size: 12rem;
+    text-align: left;
     background-color: transparent;
     border: none;
-    color: $text;
+    cursor: pointer;
+}
 
-    .box {
-        margin-right: 0;
-    }
+.name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge {
+    margin-left: 6rem;
+    padding: 1rem 6rem;
+    color: $muted;
+    font-size: 11rem;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 10rem;
+}
+
+.tag {
+    margin-left: 6rem;
+    padding: 1rem 6rem;
+    color: $text;
+    font-size: 10rem;
+    background-color: $accent;
+    border-radius: 10rem;
+}
+
+.check {
+    width: 18rem;
+    height: 18rem;
+    margin: 0 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: $text;
+    font-size: 12rem;
+    background-color: transparent;
+    border: 1rem solid $muted;
+    border-radius: 4rem;
+    cursor: pointer;
+}
+
+.checkOn {
+    background-color: $accent;
+    border-color: $accent;
 }
 
 .dim {
     opacity: 0.5;
 }
 
-.name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
+.disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
-.meta {
-    color: $muted;
-    font-size: 12rem;
-    margin-left: 8rem;
-}
-
-.empty {
-    color: $muted;
-    font-size: 12rem;
-    padding: 4rem 0;
-}
-
-.toggle {
+.switchRow {
     display: flex;
     flex-direction: row;
     align-items: center;
     width: 100%;
-    padding: 4rem 4rem;
+    padding: 6rem 4rem;
     color: $text;
     font-size: 13rem;
+    text-align: left;
     background-color: transparent;
     border: none;
+    border-radius: $radius;
+    cursor: pointer;
 
     &:hover {
-        background-color: rgba(255, 255, 255, 0.08);
+        background-color: $surface;
     }
 }
 
-.box {
-    width: 16rem;
-    height: 16rem;
-    margin-right: 8rem;
-    border: 1rem solid $muted;
-    border-radius: 2rem;
+.switchText {
+    flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12rem;
+    flex-direction: column;
 }
 
-.on .box {
+.switchHint {
+    color: $muted;
+    font-size: 11rem;
+    margin-top: 1rem;
+}
+
+.switch {
+    width: 34rem;
+    height: 18rem;
+    padding: 2rem;
+    display: flex;
+    flex-direction: row;
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 9rem;
+}
+
+.knob {
+    width: 14rem;
+    height: 14rem;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 7rem;
+}
+
+.switchOn {
+    justify-content: flex-end;
     background-color: $accent;
-    border-color: $accent;
+}
+
+.indent {
+    margin: 0 0 4rem 12rem;
+    padding-left: 8rem;
+    border-left: 2rem solid $line;
 }
 
 .stepper {
     display: flex;
     flex-direction: row;
     align-items: center;
-    color: $text;
+    padding: 5rem 4rem;
     font-size: 13rem;
-    padding: 4rem 4rem;
-
-    span {
-        flex: 1;
-    }
-
-    b {
-        min-width: 60rem;
-        text-align: center;
-    }
 }
 
-.small {
-    padding: 2rem 8rem;
+.stepperLabel {
+    flex: 1;
+}
+
+.stepButton {
+    width: 24rem;
+    height: 24rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: $text;
-    font-size: 12rem;
-    background-color: rgba(255, 255, 255, 0.1);
+    font-size: 14rem;
+    background-color: $surface-hover;
     border: none;
-    border-radius: 3rem;
+    border-radius: $radius;
+    cursor: pointer;
 
     &:hover {
         background-color: rgba(255, 255, 255, 0.2);
     }
 }
 
-.footer {
-    display: flex;
-    flex-direction: row;
-    margin-top: 10rem;
-    padding-top: 8rem;
-    border-top: 1rem solid $line;
-}
+.stepValue {
+    min-width: 64rem;
+    text-align: center;
+    font-weight: bold;
 
-.action {
-    flex: 1;
-    padding: 6rem 4rem;
-    margin-right: 4rem;
-    color: $text;
-    font-size: 13rem;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: none;
-    border-radius: 3rem;
-
-    &:hover {
-        background-color: rgba(75, 170, 255, 0.4);
+    small {
+        margin-left: 2rem;
+        color: $muted;
+        font-weight: normal;
+        font-size: 11rem;
     }
 }
 
@@ -248,10 +545,40 @@ $line: rgba(255, 255, 255, 0.12);
     pointer-events: auto;
 }
 
-.anarchyOn {
-    background-color: rgba(230, 90, 60, 0.75);
+// ---- Footer ----
+
+.footer {
+    display: flex;
+    flex-direction: row;
+    padding: 10rem 12rem;
+    border-top: 1rem solid $line;
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.button {
+    flex: 1;
+    padding: 8rem 6rem;
+    margin-right: 6rem;
+    color: $text;
+    font-size: 13rem;
+    background-color: $surface-hover;
+    border: none;
+    border-radius: $radius;
+    cursor: pointer;
+
+    &:last-child {
+        margin-right: 0;
+    }
 
     &:hover {
-        background-color: rgba(230, 90, 60, 0.9);
+        background-color: rgba(255, 255, 255, 0.18);
+    }
+}
+
+.primary {
+    background-color: rgba(83, 170, 255, 0.75);
+
+    &:hover {
+        background-color: $accent;
     }
 }
