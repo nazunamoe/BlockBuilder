@@ -480,6 +480,20 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
                 <div className={styles.note}>{t("sizeOrderHint")}</div>
             </Group>
 
+            <Group title={t("roadOrder")}>
+                <Segmented
+                    value={state.roadOrder}
+                    onChange={actions.setRoadOrder}
+                    options={[
+                        { value: 0, label: t("roadDefault") },
+                        { value: 1, label: t("roadWide") },
+                        { value: 2, label: t("roadNarrow") },
+                        { value: 3, label: t("roadRandom") },
+                    ]}
+                />
+                <div className={styles.note}>{t("roadOrderHint")}</div>
+            </Group>
+
             <Group title={t("options")}>
                 <Switch value={state.fillRest} onChange={actions.setFillRest} label={t("fillRest")} hint={t("fillRestHint")} />
                 <Switch value={state.generateRoads} onChange={actions.setGenerateRoads} label={t("generateRoads")} hint={t("generateRoadsHint")} />
@@ -501,7 +515,9 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
                 {state.treeFill && (
                     <div className={styles.indent}>
                         <Stepper label={t("treeSpacing")} value={state.treeSpacing} unit="m" step={2} onChange={actions.setTreeSpacing} />
+                        <Stepper label={t("treeDensity")} value={state.treeDensity} unit="%" step={10} onChange={actions.setTreeDensity} />
                         <div className={styles.note}>{`${state.trees} ${t("treeCount")}`}</div>
+                        {state.treesCapped && <div className={styles.note}>{t("treeCapNote")}</div>}
                         <div className={styles.note}>{t("treeSpecies")}</div>
                         <div className={styles.note}>{t("treeSets")}</div>
                         <div className={styles.chipRow}>

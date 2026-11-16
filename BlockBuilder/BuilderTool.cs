@@ -628,9 +628,15 @@ namespace BlockBuilder
         private bool m_MoveOk;
         private int m_MoveVersion;
 
-        /// <summary>The options that decide the layout (not the area, the pins or the brush).</summary>
-        private static string OptionsKey(Setting o) =>
-            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{o.SizeOrderMode}|{o.SizeKeyMode}|{o.VariantIndex}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
+        /// <summary>
+        /// The options that decide the layout (not the area, the pins or the brush). Both keys are
+        /// built from this one list, so a new layout option cannot be added to only one of them.
+        /// </summary>
+        private static string LayoutOptionsKey(Setting o) =>
+            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{o.SizeOrderMode}|{o.SizeKeyMode}|{o.RoadOrderMode}|{o.VariantIndex}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
+
+        /// <summary>The options whose change releases the moved/pinned lots.</summary>
+        private static string OptionsKey(Setting o) => LayoutOptionsKey(o);
 
         /// <summary>
         /// Ctrl+left drag on a lot of the preview moves it: the lot follows the cursor, snapped against
@@ -855,7 +861,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{options.VariantIndex}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}|{options.TreeFill && m_Moving == null}";
+            $"{LayoutOptionsKey(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}|{options.TreeFill && m_Moving == null}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -1204,6 +1210,7 @@ namespace BlockBuilder
                     SizeBy = (SizeKey)System.Math.Max(0, System.Math.Min(2, options.SizeKeyMode)),
                     Step = DensityStep(options),
                     FitRows = true,
+                    Roads = (RoadOrder)System.Math.Max(0, System.Math.Min(3, options.RoadOrderMode)),
                     Variant = options.VariantIndex,
                 },
                 Fixed = m_Fixed.Concat(m_Frozen).Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
@@ -1292,6 +1299,7 @@ namespace BlockBuilder
             }
 
             m_TreeCount = 0;
+            m_TreeCapped = false;
             if (options.TreeFill && m_Moving == null && options.PlacementMode != FillMode.FixedOnly)
             {
                 deps = SubmitTrees(options, deps);
@@ -1302,10 +1310,17 @@ namespace BlockBuilder
 
         private int m_TreeCount;
 
+        /// <summary>The plan wanted more trees than the per-plan cap: the panel says so.</summary>
+        private bool m_TreeCapped;
+
         internal int PlannedTrees => m_State == State.Planned ? m_TreeCount : 0;
+
+        internal bool PlannedTreesCapped => m_State == State.Planned && m_TreeCapped;
 
         internal const int kDefaultTreeSpacing = 8;
         private const int kMaxTrees = 400;
+
+        internal static int TreeDensityOf(Setting o) => o.TreeDensity > 0 ? System.Math.Min(100, o.TreeDensity) : 80;
 
         internal static int TreeSpacingOf(Setting o) => o.TreeSpacing > 0 ? o.TreeSpacing : kDefaultTreeSpacing;
 
@@ -1341,7 +1356,7 @@ namespace BlockBuilder
             {
                 Spacing = TreeSpacingOf(options),
                 Clearance = 2,
-                Thinning = 0.25,
+                Thinning = 1 - TreeDensityOf(options) / 100.0,
                 Seed = options.Seed,
                 MaxTrees = kMaxTrees,
                 Species = species.Count,
@@ -1355,6 +1370,7 @@ namespace BlockBuilder
             }
 
             m_TreeCount = spots.Count;
+            m_TreeCapped = spots.Count >= kMaxTrees;
             Mod.log.Info($"builder: trees={spots.Count} species={species.Count} spacing={TreeSpacingOf(options)} in {watch.ElapsedMilliseconds} ms{(spots.Count >= kMaxTrees ? " (cap reached)" : string.Empty)}");
             return deps;
         }

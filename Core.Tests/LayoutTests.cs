@@ -171,6 +171,38 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void RoadOrder_CornerLotFacesTheChosenRoad()
+        {
+            // A wide road below (id 1, the SHORTER frontage) and a narrow road on the left (id 2, the
+            // longer one) meet at the corner (0,0): by length the narrow road would win the corner.
+            LayoutResult Plan(RoadOrder order, int seed = 1)
+            {
+                var request = new LayoutRequest
+                {
+                    Boundary = Rect(0, 0, 64, 96),
+                    ExistingRoads = { Road(-40, -8, 120, -8, 16, 1), Road(-4, -40, -4, 140, 8, 2) },
+                    Items = { Item("house", 3, 3) },
+                };
+                request.Options.Roads = order;
+                request.Options.Seed = seed;
+                var result = LayoutEngine.Run(request);
+                AssertValid(request, result);
+                return result;
+            }
+
+            int Corner(LayoutResult r) => r.Placements.OrderBy(p => Vec2.Distance(p.Box.Center, new Vec2(12, 12))).First().FrontageRoadId;
+
+            Assert.Equal(2, Corner(Plan(RoadOrder.Default)));
+            Assert.Equal(1, Corner(Plan(RoadOrder.WideFirst)));
+            Assert.Equal(2, Corner(Plan(RoadOrder.NarrowFirst)));
+
+            // Random: repeatable for a seed, and both roads win the corner across seeds.
+            Assert.Equal(Plan(RoadOrder.Random, 5).Placements.Select(p => p.Box.Center), Plan(RoadOrder.Random, 5).Placements.Select(p => p.Box.Center));
+            var corners = Enumerable.Range(1, 16).Select(seed => Corner(Plan(RoadOrder.Random, seed))).Distinct().ToList();
+            Assert.Equal(2, corners.Count);
+        }
+
+        [Fact]
         public void RowAlongRoad_IsFlushFacingRoadAtLotPitch()
         {
             // Road centre y=-4, width 8: its edge is exactly the block's bottom edge (y=0).

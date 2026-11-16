@@ -12,7 +12,11 @@ namespace BlockBuilder.Core
         /// <summary>Share of the free spots left empty, in clumps (0 = every spot, 1 = none).</summary>
         public double Thinning = 0.25;
         public int Seed = 1;
-        /// <summary>Most trees returned (the scatter stops there).</summary>
+        /// <summary>
+        /// Most trees returned. When more spots qualify, the trees kept are an even sample of the
+        /// whole area (by hash rank), so raising the cap or changing a nearby lot can change which
+        /// trees survive even far away.
+        /// </summary>
         public int MaxTrees = 400;
         /// <summary>Number of species to mix; each tree gets an index below this.</summary>
         public int Species = 1;
@@ -33,13 +37,16 @@ namespace BlockBuilder.Core
     /// Trees for the ground a layout leaves empty: single trees on a jittered grid, thinned into
     /// loose clumps (the "lawn scatter" behaviour of park tools). Everything about a spot comes
     /// from a hash of its grid cell and the seed, and the grid is anchored to the world, so the same
-    /// input gives the same trees and changing one lot only changes the trees next to it.
+    /// input gives the same trees and changing one lot only changes the trees next to it. The one
+    /// exception is the <see cref="TreeOptions.MaxTrees"/> cap: once it binds, the kept trees are a
+    /// global sample, so a local change can shift which trees survive anywhere in the area.
     /// </summary>
     public static class TreeScatter
     {
         public static List<TreeSpot> Plan(IReadOnlyList<IReadOnlyList<Vec2>> rings, IReadOnlyList<Obb> blocked, TreeOptions options)
         {
             var trees = new List<TreeSpot>();
+            var ranks = new List<uint>();
             options = options ?? new TreeOptions();
             double pitch = Math.Max(2, options.Spacing);
             double clear = Math.Max(0, options.Clearance);
@@ -79,15 +86,10 @@ namespace BlockBuilder.Core
                 {
                     for (int i = i0; i <= i1; i++)
                     {
-                        if (trees.Count >= options.MaxTrees)
-                        {
-                            return trees;
-                        }
-
                         uint h = Hash(i, j, options.Seed);
                         // Clumps: neighbouring cells share a coarse noise value, so gaps and groups form.
                         double noise = 0.6 * Unit(Hash(Div(i, 3), Div(j, 3), options.Seed + 17)) + 0.4 * Unit(Hash(i, j, options.Seed + 31));
-                        if (noise < options.Thinning)
+                        if (Uniform(noise) < options.Thinning)
                         {
                             continue;
                         }
@@ -103,6 +105,7 @@ namespace BlockBuilder.Core
 
                         uint a = h * 2246822519u + 7;
                         double age = Unit(a);
+                        ranks.Add(h * 374761393u + 5);
                         trees.Add(new TreeSpot
                         {
                             Position = at,
@@ -115,7 +118,49 @@ namespace BlockBuilder.Core
                 }
             }
 
+            if (trees.Count > options.MaxTrees)
+            {
+                // Over the cap: keep an even sample of the whole area, not just the first rows.
+                var order = new int[trees.Count];
+                for (int k = 0; k < order.Length; k++)
+                {
+                    order[k] = k;
+                }
+
+                Array.Sort(order, (a, b) => ranks[a] != ranks[b] ? ranks[a].CompareTo(ranks[b]) : a.CompareTo(b));
+                var keep = new bool[trees.Count];
+                for (int k = 0; k < options.MaxTrees; k++)
+                {
+                    keep[order[k]] = true;
+                }
+
+                var kept = new List<TreeSpot>(options.MaxTrees);
+                for (int k = 0; k < trees.Count; k++)
+                {
+                    if (keep[k])
+                    {
+                        kept.Add(trees[k]);
+                    }
+                }
+
+                return kept;
+            }
+
             return trees;
+        }
+
+        /// <summary>
+        /// The clump noise is 0.6·U + 0.4·V (a trapezoid, not uniform); this maps it to its rank in
+        /// 0..1, so a thinning of t really leaves out the share t of the spots.
+        /// </summary>
+        private static double Uniform(double x)
+        {
+            if (x <= 0.4)
+            {
+                return x * x / 0.48;
+            }
+
+            return x <= 0.6 ? (x - 0.2) / 0.6 : 1 - (1 - x) * (1 - x) / 0.48;
         }
 
         private static bool Free(List<(Obb Box, double Radius)> boxes, Vec2 p)

@@ -179,11 +179,21 @@ namespace BlockBuilder
         /// <summary>Saved Tree Controller sets as (file name without extension, prefab names).</summary>
         private static System.Collections.Generic.List<(string Id, System.Collections.Generic.List<string> Names)> ReadTreeSetFiles()
         {
+            // The panel polls the folder and re-reads lists often; parsing every *.xml each time is a
+            // main-thread hitch with several or large set files. Reuse the last parse until they change.
+            string stamp = TreeSetStamp();
+            if (s_TreeSetFiles != null && stamp == s_TreeSetFilesStamp)
+            {
+                return s_TreeSetFiles;
+            }
+
             var sets = new System.Collections.Generic.List<(string, System.Collections.Generic.List<string>)>();
             try
             {
                 if (!System.IO.Directory.Exists(TreeSetFolder))
                 {
+                    s_TreeSetFilesStamp = stamp;
+                    s_TreeSetFiles = sets;
                     return sets;
                 }
 
@@ -215,8 +225,13 @@ namespace BlockBuilder
                 Mod.log.Warn($"tree sets: could not read Tree Controller sets: {e.Message}");
             }
 
+            s_TreeSetFilesStamp = stamp;
+            s_TreeSetFiles = sets;
             return sets;
         }
+
+        private static string s_TreeSetFilesStamp;
+        private static System.Collections.Generic.List<(string Id, System.Collections.Generic.List<string> Names)> s_TreeSetFiles;
 
         /// <summary>Changes when a set file is added, removed or saved again.</summary>
         private static string TreeSetStamp()
@@ -332,8 +347,33 @@ namespace BlockBuilder
                     Edit(o => o.Selection = mode);
                 }
             }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setRoadOrder", n =>
+            {
+                // Clicking the selected segment again changes nothing: do not replan for it.
+                int value = System.Math.Max(0, System.Math.Min(3, n));
+                if (Mod.Options != null && Mod.Options.RoadOrderMode != value)
+                {
+                    Edit(o => o.RoadOrderMode = value);
+                }
+            }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setTreeDensity", n =>
+            {
+                // A click at either end changes nothing: do not replan for it.
+                int value = System.Math.Max(10, System.Math.Min(100, n));
+                if (Mod.Options != null && BuilderTool.TreeDensityOf(Mod.Options) != value)
+                {
+                    Edit(o => o.TreeDensity = value);
+                }
+            }));
             AddBinding(new TriggerBinding<bool>(kGroup, "setTreeFill", b => Edit(o => o.TreeFill = b)));
-            AddBinding(new TriggerBinding<int>(kGroup, "setTreeSpacing", n => Edit(o => o.TreeSpacing = System.Math.Max(4, System.Math.Min(30, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setTreeSpacing", n =>
+            {
+                int value = System.Math.Max(4, System.Math.Min(30, n));
+                if (Mod.Options != null && BuilderTool.TreeSpacingOf(Mod.Options) != value)
+                {
+                    Edit(o => o.TreeSpacing = value);
+                }
+            }));
             AddBinding(new TriggerBinding<string>(kGroup, "applyTreeSet", id =>
             {
                 var set = ReadTreeSets().FirstOrDefault(x => x.Id == id);
@@ -400,6 +440,8 @@ namespace BlockBuilder
 
                 palette.Entries.Clear();
                 PaletteStore.Update(options.ActivePalette);
+                // The preview was planned from the list: replan it without the removed entries.
+                Edit(o => { });
             }));
             AddBinding(new TriggerBinding<string>(kGroup, "removeItemByName", name =>
             {
@@ -545,6 +587,8 @@ namespace BlockBuilder
 
             palette.Entries.RemoveAt(index);
             PaletteStore.Update(options.ActivePalette);
+            // Same as adding: a removal must replan, or Build applies a cached plan that still has it.
+            Edit(o => { });
         }
 
         private static void AddItems(IEnumerable<string> names)
@@ -767,9 +811,12 @@ namespace BlockBuilder
             Prop(sb, "brush", (int)BuilderTool.BrushRadius(o));
             Prop(sb, "density", (int)o.Density);
             Prop(sb, "maxArea", BuilderTool.MaxAreaOf(o));
+            Prop(sb, "roadOrder", o.RoadOrderMode);
+            Prop(sb, "treeDensity", BuilderTool.TreeDensityOf(o));
             Prop(sb, "treeFill", o.TreeFill);
             Prop(sb, "treeSpacing", BuilderTool.TreeSpacingOf(o));
             Prop(sb, "trees", m_Tool.PlannedTrees);
+            Prop(sb, "treesCapped", m_Tool.PlannedTreesCapped);
             Prop(sb, "sizeOrder", o.SizeOrderMode);
             Prop(sb, "sizeKey", o.SizeKeyMode);
             Prop(sb, "overlapSide", o.OverlapSide);
@@ -781,7 +828,7 @@ namespace BlockBuilder
             Prop(sb, "crossRoads", !o.StopAtRoads);
             Prop(sb, "fillInterior", o.FillInterior);
             Prop(sb, "blockLength", o.MaxBlockLength);
-            Prop(sb, "road", o.NewRoadName ?? string.Empty);
+            Prop(sb, "road", (m_Catalog.FindRoad(o.NewRoadName?.Trim()) ?? m_Catalog.FindRoad("Small Road"))?.Name ?? o.NewRoadName ?? string.Empty);
             Prop(sb, "status", m_Tool.Status ?? string.Empty);
             Prop(sb, "ko", Mod.IsKorean);
             sb.Append("\"warnings\":");

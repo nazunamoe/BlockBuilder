@@ -48,8 +48,8 @@ namespace BlockBuilder
 
     [FileLocation(nameof(BlockBuilder))]
     [SettingsUITabOrder(kBuilderTab, kSection)]
-    [SettingsUIGroupOrder(kKeyGroup, kBuildGroup, kPaletteGroup, kSpikeGroup, kDebugGroup)]
-    [SettingsUIShowGroupName(kKeyGroup, kBuildGroup, kPaletteGroup, kSpikeGroup, kDebugGroup)]
+    [SettingsUIGroupOrder(kKeyGroup, kBuildGroup, kPaletteGroup, kDebugGroup)]
+    [SettingsUIShowGroupName(kKeyGroup, kBuildGroup, kPaletteGroup, kDebugGroup)]
     [SettingsUIKeyboardAction(kToggleAction, ActionType.Button, usages: new[] { Usages.kDefaultUsage, Usages.kToolUsage })]
     public class Setting : ModSetting
     {
@@ -184,6 +184,14 @@ namespace BlockBuilder
         /// <summary>What size means for the order: 0 area, 1 width, 2 depth. Set in the panel.</summary>
         [SettingsUIHidden]
         public int SizeKeyMode { get; set; }
+
+        /// <summary>Which roads get their lots first: 0 default (longest), 1 widest, 2 narrowest, 3 random. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int RoadOrderMode { get; set; }
+
+        /// <summary>Share of free spots that get a tree, percent; 0 means the default (80). Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int TreeDensity { get; set; }
 
         /// <summary>Plant trees on the ground the layout leaves empty. Set in the panel.</summary>
         [SettingsUIHidden]
@@ -348,28 +356,29 @@ namespace BlockBuilder
             return items.ToArray();
         }
 
-        [SettingsUISection(kSection, kSpikeGroup)]
+        // The spike tooling is kept for local technical validation but is not offered in the public
+        // build. To show it again, mark these properties [SettingsUISection(kSection, kSpikeGroup)]
+        // (plus [SettingsUITextInput] on the two overrides, [SettingsUISlider(min = 1, max = 10,
+        // step = 1)] on RowCount and [SettingsUIButton] on ActivateTool) and add kSpikeGroup back to
+        // the group-order attributes above.
+        [SettingsUIHidden]
         public SpikeCase TestCase { get; set; }
 
         /// <summary>Optional prefab name; empty means pick one from the catalog scan.</summary>
-        [SettingsUITextInput]
-        [SettingsUISection(kSection, kSpikeGroup)]
+        [SettingsUIHidden]
         public string PrefabOverride { get; set; }
 
         /// <summary>Optional road prefab name for the road tests; empty means the narrowest vanilla road.</summary>
-        [SettingsUITextInput]
-        [SettingsUISection(kSection, kSpikeGroup)]
+        [SettingsUIHidden]
         public string RoadOverride { get; set; }
 
-        [SettingsUISlider(min = 1, max = 10, step = 1)]
-        [SettingsUISection(kSection, kSpikeGroup)]
+        [SettingsUIHidden]
         public int RowCount { get; set; }
 
-        [SettingsUISection(kSection, kSpikeGroup)]
+        [SettingsUIHidden]
         public bool ApplyDespiteErrors { get; set; }
 
-        [SettingsUIButton]
-        [SettingsUISection(kSection, kSpikeGroup)]
+        [SettingsUIHidden]
         public bool ActivateTool
         {
             set
@@ -413,6 +422,18 @@ namespace BlockBuilder
             FilterSource = Core.SourceFilter.Vanilla;
             FilterIncludeSignature = false;
             NewPaletteName = "My palette";
+
+            // Panel-only values (0 / false / empty = their defaults).
+            SizeOrderMode = 0;
+            SizeKeyMode = 0;
+            RoadOrderMode = 0;
+            VariantIndex = 0;
+            MaxArea = 0;
+            TreeFill = false;
+            TreeSpacing = 0;
+            TreeDensity = 0;
+            TreeNames = string.Empty;
+            StopAtRoads = false;
         }
     }
 

@@ -27,6 +27,8 @@ namespace BlockBuilder.Core
         public int Side;
         public int RoadId;
         public int RoadIndex = -1;
+        /// <summary>Width of the road this frontage lines, metres.</summary>
+        public double Width;
 
         public double Length => Cum.Count == 0 ? 0 : Cum[Cum.Count - 1];
 
@@ -355,7 +357,7 @@ namespace BlockBuilder.Core
                         if (!(open && run != null && t0 < 1e-6))
                         {
                             Close(fronts, ref run);
-                            run = new Frontage { Side = side, RoadId = roadId, RoadIndex = roadIndex };
+                            run = new Frontage { Side = side, RoadId = roadId, RoadIndex = roadIndex, Width = width };
                             run.Add(Vec2.Lerp(a, b, t0));
                         }
 

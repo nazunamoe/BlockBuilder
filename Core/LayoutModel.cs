@@ -38,6 +38,16 @@ namespace BlockBuilder.Core
         FixedOnly,
     }
 
+    /// <summary>Which road gets its lots first (a corner lot faces the road filled first).</summary>
+    public enum RoadOrder
+    {
+        /// <summary>Longest frontage first.</summary>
+        Default,
+        WideFirst,
+        NarrowFirst,
+        Random,
+    }
+
     public enum SizeOrder
     {
         Mixed,
@@ -91,6 +101,9 @@ namespace BlockBuilder.Core
         /// end, bit 1 lets short frontages claim corners first, higher bits offset the seed.
         /// </summary>
         public int Variant;
+
+        /// <summary>Which roads are filled first; the rest follow by length.</summary>
+        public RoadOrder Roads = RoadOrder.Default;
 
         /// <summary>Which lot the fill tries first: random by weight, biggest first or smallest first.</summary>
         public SizeOrder Order = SizeOrder.Mixed;

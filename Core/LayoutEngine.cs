@@ -96,8 +96,29 @@ namespace BlockBuilder.Core
                 double minWidth = roadItems.Min(i => i.Width);
                 var usable = fronts.Where(f => f.Length + 1e-6 >= minWidth);
                 // Long frontages first by default; variants let the short ones take the corners.
-                var ordered = (variant & 2) != 0 ? usable.OrderBy(f => f.Length) : usable.OrderByDescending(f => f.Length);
-                foreach (var front in ordered.ToList())
+                var byLength = ((variant & 2) != 0 ? usable.OrderBy(f => f.Length) : usable.OrderByDescending(f => f.Length)).ToList();
+                // Widths within 0.1 m count as the same class (prefab widths are floats).
+                double WidthOf(Frontage f) => Math.Round(f.Width * 10) / 10;
+
+                // Stable sorts: among roads of the same width (or every road, by default) length decides.
+                List<Frontage> ordered;
+                switch (ctx.Options.Roads)
+                {
+                    case RoadOrder.WideFirst:
+                        ordered = byLength.OrderByDescending(WidthOf).ToList();
+                        break;
+                    case RoadOrder.NarrowFirst:
+                        ordered = byLength.OrderBy(WidthOf).ToList();
+                        break;
+                    case RoadOrder.Random:
+                        ordered = byLength.Select((f, k) => (f, k)).OrderBy(x => StableHash("road" + x.k + "|" + variant, ctx.Options.Seed)).Select(x => x.f).ToList();
+                        break;
+                    default:
+                        ordered = byLength;
+                        break;
+                }
+
+                foreach (var front in ordered)
                 {
                     FillFrontage(ctx, front, roadItems);
                 }
@@ -354,6 +375,12 @@ namespace BlockBuilder.Core
                 h = (h ^ ch) * 16777619u;
             }
 
+            // Final mix: without it keys that differ in the last character differ in few bits.
+            h ^= h >> 16;
+            h *= 2246822519u;
+            h ^= h >> 13;
+            h *= 3266489917u;
+            h ^= h >> 16;
             return h;
         }
 

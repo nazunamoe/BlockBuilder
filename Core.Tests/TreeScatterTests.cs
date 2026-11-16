@@ -74,6 +74,26 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void Density_PlantsAboutTheAskedShare()
+        {
+            var ring = Rect(0, 0, 400, 400);
+            int Count(double thinning) => TreeScatter.Plan(Rings(ring), new List<Obb>(), new TreeOptions { Spacing = 8, Clearance = 0, Thinning = thinning, MaxTrees = 100000 }).Count;
+            int all = Count(0);
+            Assert.InRange(Count(0.9) / (double)all, 0.06, 0.14);
+            Assert.InRange(Count(0.5) / (double)all, 0.44, 0.56);
+            Assert.InRange(Count(0.2) / (double)all, 0.74, 0.86);
+        }
+
+        [Fact]
+        public void Cap_KeepsTreesSpreadOverTheWholeArea()
+        {
+            var trees = TreeScatter.Plan(Rings(Rect(0, 0, 400, 400)), new List<Obb>(), new TreeOptions { Spacing = 8, Thinning = 0, MaxTrees = 200 });
+            Assert.Equal(200, trees.Count);
+            Assert.True(trees.Max(t => t.Position.Y) > 300, "trees reach the far side");
+            Assert.True(trees.Min(t => t.Position.Y) < 100);
+        }
+
+        [Fact]
         public void MovingOneLot_LeavesDistantTreesUnchanged()
         {
             var ring = Rect(0, 0, 240, 120);

@@ -28,9 +28,12 @@ export interface BuilderState {
     fillInterior: boolean;
     crossRoads: boolean;
     maxArea: number;
+    roadOrder: number;
+    treeDensity: number;
     treeFill: boolean;
     treeSpacing: number;
     trees: number;
+    treesCapped: boolean;
     sizeOrder: number;
     sizeKey: number;
     blockLength: number;
@@ -137,9 +140,12 @@ const emptyState: BuilderState = {
     fillInterior: false,
     crossRoads: true,
     maxArea: 60000,
+    roadOrder: 0,
+    treeDensity: 80,
     treeFill: false,
     treeSpacing: 8,
     trees: 0,
+    treesCapped: false,
     sizeOrder: 0,
     sizeKey: 0,
     blockLength: 160,
@@ -169,6 +175,8 @@ export function parseLists(json: string): Lists {
 export const actions = {
     toggle: () => trigger(GROUP, "toggle"),
     clearArea: () => trigger(GROUP, "clearArea"),
+    setRoadOrder: (n: number) => trigger(GROUP, "setRoadOrder", n),
+    setTreeDensity: (n: number) => trigger(GROUP, "setTreeDensity", n),
     setTreeFill: (b: boolean) => trigger(GROUP, "setTreeFill", b),
     setTreeSpacing: (n: number) => trigger(GROUP, "setTreeSpacing", n),
     applyTreeSet: (id: string) => trigger(GROUP, "applyTreeSet", id),
