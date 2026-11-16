@@ -855,7 +855,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{options.VariantIndex}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{options.VariantIndex}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}|{options.TreeFill && m_Moving == null}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -1291,6 +1291,71 @@ namespace BlockBuilder
                 deps = SubmitObject(entry.Prefab, Ground(p.Box.Center), rotation, i, deps);
             }
 
+            m_TreeCount = 0;
+            if (options.TreeFill && m_Moving == null && options.PlacementMode != FillMode.FixedOnly)
+            {
+                deps = SubmitTrees(options, deps);
+            }
+
+            return deps;
+        }
+
+        private int m_TreeCount;
+
+        internal int PlannedTrees => m_State == State.Planned ? m_TreeCount : 0;
+
+        internal const int kDefaultTreeSpacing = 8;
+        private const int kMaxTrees = 400;
+
+        internal static int TreeSpacingOf(Setting o) => o.TreeSpacing > 0 ? o.TreeSpacing : kDefaultTreeSpacing;
+
+        private static readonly Game.Tools.AgeMask[] kTreeAges = { Game.Tools.AgeMask.Sapling, Game.Tools.AgeMask.Young, Game.Tools.AgeMask.Mature, Game.Tools.AgeMask.Elderly };
+
+        /// <summary>Checked trees, or every base-game tree when none is checked.</summary>
+        private List<TreeEntry> TreeSpecies(Setting options)
+        {
+            var names = new HashSet<string>((options.TreeNames ?? string.Empty).Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries));
+            var chosen = m_Catalog.Trees.Where(t => names.Contains(t.Name)).ToList();
+            return chosen.Count > 0 ? chosen : m_Catalog.Trees.Where(t => !t.FromMod).ToList();
+        }
+
+        /// <summary>
+        /// Trees on the ground the plan leaves empty (a separate pass: they are not lots, so moving,
+        /// freezing and the counts ignore them). Clear of every lot, road and existing building.
+        /// </summary>
+        private JobHandle SubmitTrees(Setting options, JobHandle deps)
+        {
+            var species = TreeSpecies(options);
+            if (species.Count == 0 || m_Plan == null)
+            {
+                Note("no tree prefabs found to plant", "심을 나무 프리팹을 찾지 못했습니다");
+                return deps;
+            }
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var blocked = m_Plan.Placements.Select(p => p.Box).ToList();
+            blocked.AddRange(m_LastRoads.Concat(PlannedRoadSegments()).Select(r => Obb.FromSegment(r.A, r.B, r.Width)));
+            blocked.AddRange(m_LastObstacles);
+            var rings = m_PlanRings.Where(r => r != null && r.Count >= 3).Cast<IReadOnlyList<Vec2>>().ToList();
+            var spots = TreeScatter.Plan(rings, blocked, new TreeOptions
+            {
+                Spacing = TreeSpacingOf(options),
+                Clearance = 2,
+                Thinning = 0.25,
+                Seed = options.Seed,
+                MaxTrees = kMaxTrees,
+                Species = species.Count,
+            });
+
+            for (int i = 0; i < spots.Count; i++)
+            {
+                var spot = spots[i];
+                var rotation = quaternion.RotateY((float)spot.Yaw);
+                deps = SubmitObject(species[spot.Species % species.Count].Prefab, Ground(spot.Position), rotation, 20000 + i, deps, kTreeAges[spot.Age & 3]);
+            }
+
+            m_TreeCount = spots.Count;
+            Mod.log.Info($"builder: trees={spots.Count} species={species.Count} spacing={TreeSpacingOf(options)} in {watch.ElapsedMilliseconds} ms{(spots.Count >= kMaxTrees ? " (cap reached)" : string.Empty)}");
             return deps;
         }
 
@@ -1503,7 +1568,7 @@ namespace BlockBuilder
             }
         }
 
-        private JobHandle SubmitObject(Entity prefab, float3 position, quaternion rotation, int index, JobHandle deps)
+        private JobHandle SubmitObject(Entity prefab, float3 position, quaternion rotation, int index, JobHandle deps, Game.Tools.AgeMask age = Game.Tools.AgeMask.Sapling)
         {
             var points = new NativeList<ControlPoint>(1, Allocator.TempJob);
             points.Add(new ControlPoint
@@ -1521,7 +1586,7 @@ namespace BlockBuilder
                 m_City.defaultTheme, points, default(NativeReference<AttachmentData>),
                 false, m_City.leftHandTraffic, false, false,
                 0f, 0f, 0f, 0f, UnityEngine.Time.deltaTime, Seed(index),
-                Snap.None, Game.Tools.AgeMask.Sapling, false, default(PlacementOverrides), deps);
+                Snap.None, age, false, default(PlacementOverrides), deps);
             points.Dispose(handle);
             m_Submitted++;
             return handle;

@@ -55,6 +55,13 @@ namespace BlockBuilder
         };
     }
 
+    public sealed class TreeEntry
+    {
+        public string Name;
+        public Entity Prefab;
+        public bool FromMod;
+    }
+
     public sealed class RoadEntry
     {
         public string Name;
@@ -71,6 +78,8 @@ namespace BlockBuilder
     {
         public readonly List<BuildingEntry> Buildings = new List<BuildingEntry>();
         public readonly List<RoadEntry> Roads = new List<RoadEntry>();
+        /// <summary>Trees and bushes the landscaping menu offers (placeable, with a menu entry).</summary>
+        public readonly List<TreeEntry> Trees = new List<TreeEntry>();
         public bool Ready { get; private set; }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase) => 1024;
@@ -121,6 +130,7 @@ namespace BlockBuilder
             {
                 ScanBuildings();
                 ScanRoads();
+                ScanTrees();
                 Ready = true;
                 Mod.log.Info($"catalog: buildings={Buildings.Count} growable={Count(EntryKind.Growable)} park={Count(EntryKind.Park)} parking={Count(EntryKind.Parking)} service={Count(EntryKind.Service)} signature={Count(EntryKind.Signature)} upgrade={Count(EntryKind.Upgrade)} roads={Roads.Count}");
                 if (write)
@@ -209,6 +219,31 @@ namespace BlockBuilder
             }
 
             Buildings.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+        }
+
+        private void ScanTrees()
+        {
+            Trees.Clear();
+            try
+            {
+                var prefabs = World.GetOrCreateSystemManaged<PrefabSystem>();
+                using var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<TreeData>(), ComponentType.ReadOnly<PlaceableObjectData>(), ComponentType.ReadOnly<UIObjectData>());
+                using var entities = query.ToEntityArray(Allocator.Temp);
+                foreach (var e in entities)
+                {
+                    if (prefabs.TryGetPrefab<PrefabBase>(e, out var prefab) && prefab != null)
+                    {
+                        Trees.Add(new TreeEntry { Name = prefab.name, Prefab = e, FromMod = prefab.isSubscribedMod });
+                    }
+                }
+
+                Trees.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+                Mod.log.Info($"catalog: trees={Trees.Count}");
+            }
+            catch (Exception e)
+            {
+                Mod.log.Warn($"catalog: tree scan failed: {e.Message}");
+            }
         }
 
         private void ScanRoads()

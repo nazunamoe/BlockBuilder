@@ -185,6 +185,18 @@ namespace BlockBuilder
         [SettingsUIHidden]
         public int SizeKeyMode { get; set; }
 
+        /// <summary>Plant trees on the ground the layout leaves empty. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public bool TreeFill { get; set; }
+
+        /// <summary>Metres between trees; 0 means the default (8 m). Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int TreeSpacing { get; set; }
+
+        /// <summary>Checked tree prefab names, one per line; empty means every base-game tree. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public string TreeNames { get; set; }
+
         /// <summary>Largest area (square metres) that may be drawn or painted; 0 means the default. Set in the panel.</summary>
         [SettingsUIHidden]
         public int MaxArea { get; set; }

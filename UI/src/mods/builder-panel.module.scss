@@ -1030,3 +1030,15 @@ $radius: 6rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.chipRow {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 4rem;
+
+    > * {
+        margin: 0 4rem 4rem 0;
+    }
+}

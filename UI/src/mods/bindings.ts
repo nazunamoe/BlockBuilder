@@ -28,6 +28,9 @@ export interface BuilderState {
     fillInterior: boolean;
     crossRoads: boolean;
     maxArea: number;
+    treeFill: boolean;
+    treeSpacing: number;
+    trees: number;
     sizeOrder: number;
     sizeKey: number;
     blockLength: number;
@@ -54,6 +57,14 @@ export interface Lists {
     palettes: PaletteInfo[];
     checkedCount: number;
     entries: EntryInfo[];
+    trees: TreeInfo[];
+    treeSets: { id: string; count: number }[];
+}
+
+export interface TreeInfo {
+    name: string;
+    thumb: string;
+    checked: boolean;
 }
 
 /** Game.Tools.Snap bits used by the builder. */
@@ -126,6 +137,9 @@ const emptyState: BuilderState = {
     fillInterior: false,
     crossRoads: true,
     maxArea: 60000,
+    treeFill: false,
+    treeSpacing: 8,
+    trees: 0,
     sizeOrder: 0,
     sizeKey: 0,
     blockLength: 160,
@@ -146,15 +160,20 @@ export function parseState(json: string): BuilderState {
 export function parseLists(json: string): Lists {
     try {
         const v = JSON.parse(json);
-        return { palettes: v.palettes ?? [], checkedCount: v.checkedCount ?? 0, entries: v.entries ?? [] };
+        return { palettes: v.palettes ?? [], checkedCount: v.checkedCount ?? 0, entries: v.entries ?? [], trees: v.trees ?? [], treeSets: v.treeSets ?? [] };
     } catch {
-        return { palettes: [], checkedCount: 0, entries: [] };
+        return { palettes: [], checkedCount: 0, entries: [], trees: [], treeSets: [] };
     }
 }
 
 export const actions = {
     toggle: () => trigger(GROUP, "toggle"),
     clearArea: () => trigger(GROUP, "clearArea"),
+    setTreeFill: (b: boolean) => trigger(GROUP, "setTreeFill", b),
+    setTreeSpacing: (n: number) => trigger(GROUP, "setTreeSpacing", n),
+    applyTreeSet: (id: string) => trigger(GROUP, "applyTreeSet", id),
+    clearTrees: () => trigger(GROUP, "clearTrees"),
+    toggleTree: (name: string) => trigger(GROUP, "toggleTree", name),
     optimize: () => trigger(GROUP, "optimize"),
     setMaxArea: (n: number) => trigger(GROUP, "setMaxArea", n),
     shuffle: () => trigger(GROUP, "shuffle"),

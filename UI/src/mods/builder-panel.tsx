@@ -403,7 +403,22 @@ function Group({ title, extra, children }: { title: string; extra?: React.ReactN
     );
 }
 
-function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
+/** Tree Controller set ids as short labels. */
+function treeSetLabel(id: string, t: Tr): string {
+    const custom = /^YYTC-custom-set-(\d+)$/.exec(id);
+    if (custom) {
+        return `${t("treeSetName")} ${custom[1]}`;
+    }
+
+    const known: { [id: string]: string } = {
+        "YYTC-wild-deciduous-trees": t("treeSetDeciduous"),
+        "YYTC-evergreen-trees": t("treeSetEvergreen"),
+        "YYTC-wild-bushes": t("treeSetBushes"),
+    };
+    return known[id] ?? id.replace(/^YYTC-/, "");
+}
+
+function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Lists; t: Tr }) {
     const isCustom = state.density === DENSITY.custom;
     const describe = ["densityNormal", "densityRelaxed", "densityDense", "densityCustom"][state.density] ?? "densityNormal";
     return (
@@ -479,6 +494,44 @@ function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
                 <Stepper label={t("maxArea")} value={state.maxArea} unit="㎡" step={10000} onChange={actions.setMaxArea} />
                 <div className={styles.note}>{t("maxAreaHint")}</div>
                 <Switch value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} hint={t("fillInteriorHint")} />
+            </Group>
+
+            <Group title={t("treeFill")}>
+                <Switch value={state.treeFill} onChange={actions.setTreeFill} label={t("treeFill")} hint={t("treeFillHint")} />
+                {state.treeFill && (
+                    <div className={styles.indent}>
+                        <Stepper label={t("treeSpacing")} value={state.treeSpacing} unit="m" step={2} onChange={actions.setTreeSpacing} />
+                        <div className={styles.note}>{`${state.trees} ${t("treeCount")}`}</div>
+                        <div className={styles.note}>{t("treeSpecies")}</div>
+                        <div className={styles.note}>{t("treeSets")}</div>
+                        <div className={styles.chipRow}>
+                            {lists.treeSets.length === 0 && <span className={styles.note}>{t("treeSetsNone")}</span>}
+                            {lists.treeSets.map((set) => (
+                                <button key={set.id} className={styles.chip} disabled={set.count === 0} onClick={() => actions.applyTreeSet(set.id)}>
+                                    {`${treeSetLabel(set.id, t)} (${set.count})`}
+                                </button>
+                            ))}
+                            <button className={styles.chip} onClick={actions.clearTrees}>
+                                {t("treeClear")}
+                            </button>
+                        </div>
+                        {lists.trees.length === 0 ? (
+                            <div className={styles.empty}>{t("treeNone")}</div>
+                        ) : (
+                            <Scrollable className={styles.itemList} vertical>
+                                {[...lists.trees.filter((x) => x.checked), ...lists.trees.filter((x) => !x.checked)].map((tree) => (
+                                    <div key={tree.name} className={styles.itemRow}>
+                                        <Check checked={tree.checked} onClick={() => actions.toggleTree(tree.name)} />
+                                        <div className={styles.itemName}>
+                                            <Thumb src={tree.thumb} className={styles.thumb} />
+                                            <span className={styles.name}>{tree.name}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </Scrollable>
+                        )}
+                    </div>
+                )}
             </Group>
 
             <Group title={t("snap")}>
@@ -571,7 +624,7 @@ export const BuilderPanel = () => {
                                 <ListContents state={state} lists={lists} t={t} onAdd={() => setAdding(true)} />
                             </>
                         ))}
-                    {tab === "settings" && <PlacementSettings state={state} t={t} />}
+                    {tab === "settings" && <PlacementSettings state={state} lists={lists} t={t} />}
                 </Scrollable>
             </div>
 

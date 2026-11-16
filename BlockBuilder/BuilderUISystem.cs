@@ -33,26 +33,230 @@ namespace BlockBuilder
         private readonly System.Collections.Generic.Dictionary<string, string> m_Thumbs = new System.Collections.Generic.Dictionary<string, string>();
 
         /// <summary>The game's thumbnail URL for a building (what its toolbar shows); empty when it has none.</summary>
-        private string Thumb(BuildingEntry b)
+        // ---- Tree Controller custom sets (read-only: the XML files that mod saves) ----
+
+        private static string TreeSetFolder => System.IO.Path.Combine(UnityEngine.Application.persistentDataPath, "ModsData", "Mods_Yenyang_Tree_Controller", "CustomSets");
+
+        private const System.Reflection.BindingFlags kAnyInstance = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+        private static readonly string[] kTreeSetIds =
         {
-            if (b == null)
+            "YYTC-wild-deciduous-trees", "YYTC-evergreen-trees", "YYTC-wild-bushes",
+            "YYTC-custom-set-1", "YYTC-custom-set-2", "YYTC-custom-set-3", "YYTC-custom-set-4", "YYTC-custom-set-5",
+        };
+
+        private object m_TreeController;
+        private bool m_TreeControllerSearched;
+
+        /// <summary>Tree Controller's UI system when that mod is loaded (found by name; no reference to the mod).</summary>
+        private object TreeController()
+        {
+            if (!m_TreeControllerSearched)
+            {
+                m_TreeControllerSearched = true;
+                foreach (var system in World.Systems)
+                {
+                    if (system.GetType().FullName == "Tree_Controller.Tools.TreeControllerUISystem")
+                    {
+                        m_TreeController = system;
+                        break;
+                    }
+                }
+
+                Mod.log.Info($"tree sets: Tree Controller {(m_TreeController != null ? "found" : "not loaded")}");
+            }
+
+            return m_TreeController;
+        }
+
+        private static string PrefabName(object id)
+        {
+            if (id == null)
+            {
+                return null;
+            }
+
+            var getName = id.GetType().GetMethod("GetName", System.Type.EmptyTypes);
+            if (getName != null)
+            {
+                return getName.Invoke(id, null) as string;
+            }
+
+            // "Type:Name" as a fallback.
+            string text = id.ToString();
+            int colon = text.LastIndexOf(':');
+            return colon >= 0 ? text.Substring(colon + 1) : text;
+        }
+
+        private static System.Collections.Generic.List<string> Strings(object value)
+        {
+            var names = new System.Collections.Generic.List<string>();
+            if (value is System.Collections.IEnumerable items && !(value is string))
+            {
+                foreach (var item in items)
+                {
+                    string name = item as string ?? PrefabName(item);
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        names.Add(name);
+                    }
+                }
+            }
+
+            return names;
+        }
+
+        /// <summary>
+        /// Sets as Tree Controller holds them right now: the ones it has loaded (built-in and custom),
+        /// then its defaults for custom sets that were never changed (those have no file).
+        /// </summary>
+        private System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>> LiveTreeSets()
+        {
+            var live = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>();
+            var mod = TreeController();
+            if (mod == null)
+            {
+                return live;
+            }
+
+            try
+            {
+                var type = mod.GetType();
+                if (type.GetField("m_PrefabSetsLookup", kAnyInstance)?.GetValue(mod) is System.Collections.IDictionary lookup)
+                {
+                    foreach (System.Collections.DictionaryEntry entry in lookup)
+                    {
+                        var repository = entry.Value;
+                        var names = Strings(repository?.GetType().GetProperty("PrefabNames", kAnyInstance)?.GetValue(repository));
+                        if (entry.Key is string id && names.Count > 0)
+                        {
+                            live[id] = names;
+                        }
+                    }
+                }
+
+                for (int n = 1; n <= 5; n++)
+                {
+                    string id = $"YYTC-custom-set-{n}";
+                    if (!live.ContainsKey(id))
+                    {
+                        var names = Strings(type.GetField($"m_DefaultCustomSet{n}Prefabs", kAnyInstance)?.GetValue(mod));
+                        if (names.Count > 0)
+                        {
+                            live[id] = names;
+                        }
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Mod.log.Warn($"tree sets: could not read Tree Controller's live sets: {e.Message}");
+            }
+
+            return live;
+        }
+
+        /// <summary>
+        /// Tree Controller sets in its own order. A saved file wins for a custom set (it is what the
+        /// player last saved); otherwise what the mod holds in memory, including unchanged defaults.
+        /// </summary>
+        private System.Collections.Generic.List<(string Id, System.Collections.Generic.List<string> Names)> ReadTreeSets()
+        {
+            var files = ReadTreeSetFiles().ToDictionary(x => x.Id, x => x.Names);
+            var live = LiveTreeSets();
+            var sets = new System.Collections.Generic.List<(string, System.Collections.Generic.List<string>)>();
+            foreach (string id in kTreeSetIds.Concat(files.Keys).Concat(live.Keys).Distinct())
+            {
+                if (files.TryGetValue(id, out var names) || live.TryGetValue(id, out names))
+                {
+                    sets.Add((id, names));
+                }
+            }
+
+            return sets;
+        }
+
+        /// <summary>Saved Tree Controller sets as (file name without extension, prefab names).</summary>
+        private static System.Collections.Generic.List<(string Id, System.Collections.Generic.List<string> Names)> ReadTreeSetFiles()
+        {
+            var sets = new System.Collections.Generic.List<(string, System.Collections.Generic.List<string>)>();
+            try
+            {
+                if (!System.IO.Directory.Exists(TreeSetFolder))
+                {
+                    return sets;
+                }
+
+                foreach (var file in System.IO.Directory.GetFiles(TreeSetFolder, "*.xml").OrderBy(f => f, System.StringComparer.OrdinalIgnoreCase))
+                {
+                    var doc = new System.Xml.XmlDocument();
+                    doc.Load(file);
+                    var names = new System.Collections.Generic.List<string>();
+                    var nodes = doc.SelectNodes("/CustomSetRepository/PrefabNames/string");
+                    if (nodes != null)
+                    {
+                        foreach (System.Xml.XmlNode n in nodes)
+                        {
+                            if (!string.IsNullOrWhiteSpace(n.InnerText))
+                            {
+                                names.Add(n.InnerText.Trim());
+                            }
+                        }
+                    }
+
+                    if (names.Count > 0)
+                    {
+                        sets.Add((System.IO.Path.GetFileNameWithoutExtension(file), names));
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Mod.log.Warn($"tree sets: could not read Tree Controller sets: {e.Message}");
+            }
+
+            return sets;
+        }
+
+        /// <summary>Changes when a set file is added, removed or saved again.</summary>
+        private static string TreeSetStamp()
+        {
+            try
+            {
+                if (!System.IO.Directory.Exists(TreeSetFolder))
+                {
+                    return string.Empty;
+                }
+
+                var files = System.IO.Directory.GetFiles(TreeSetFolder, "*.xml");
+                return files.Length + ":" + (files.Length == 0 ? 0 : files.Max(f => System.IO.File.GetLastWriteTimeUtc(f).Ticks));
+            }
+            catch (System.Exception)
             {
                 return string.Empty;
             }
+        }
 
-            if (!m_Thumbs.TryGetValue(b.Name, out var url))
+        private string m_TreeSetStamp = string.Empty;
+        private int m_TreeSetFrame;
+
+        private string Thumb(BuildingEntry b) => b == null ? string.Empty : Thumb(b.Name, b.Prefab);
+
+        private string Thumb(string name, Unity.Entities.Entity prefab)
+        {
+            if (!m_Thumbs.TryGetValue(name, out var url))
             {
                 try
                 {
-                    url = m_Images.GetThumbnail(b.Prefab) ?? string.Empty;
+                    url = m_Images.GetThumbnail(prefab) ?? string.Empty;
                 }
                 catch (System.Exception e)
                 {
-                    Mod.log.Warn($"thumbnail of '{b.Name}' failed: {e.Message}");
+                    Mod.log.Warn($"thumbnail of '{name}' failed: {e.Message}");
                     url = string.Empty;
                 }
 
-                m_Thumbs[b.Name] = url;
+                m_Thumbs[name] = url;
             }
 
             return url;
@@ -128,6 +332,32 @@ namespace BlockBuilder
                     Edit(o => o.Selection = mode);
                 }
             }));
+            AddBinding(new TriggerBinding<bool>(kGroup, "setTreeFill", b => Edit(o => o.TreeFill = b)));
+            AddBinding(new TriggerBinding<int>(kGroup, "setTreeSpacing", n => Edit(o => o.TreeSpacing = System.Math.Max(4, System.Math.Min(30, n)))));
+            AddBinding(new TriggerBinding<string>(kGroup, "applyTreeSet", id =>
+            {
+                var set = ReadTreeSets().FirstOrDefault(x => x.Id == id);
+                if (set.Names == null)
+                {
+                    return;
+                }
+
+                var known = new System.Collections.Generic.HashSet<string>(m_Catalog.Trees.Select(t => t.Name));
+                var usable = set.Names.Where(known.Contains).Distinct().OrderBy(x => x, System.StringComparer.Ordinal).ToList();
+                Mod.log.Info($"tree sets: applied '{id}': {usable.Count} of {set.Names.Count} entries are trees in the catalog");
+                Edit(o => o.TreeNames = string.Join("\n", usable));
+            }));
+            AddBinding(new TriggerBinding(kGroup, "clearTrees", () => Edit(o => o.TreeNames = string.Empty)));
+            AddBinding(new TriggerBinding<string>(kGroup, "toggleTree", name => Edit(o =>
+            {
+                var set = new System.Collections.Generic.HashSet<string>((o.TreeNames ?? string.Empty).Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries));
+                if (!set.Remove(name))
+                {
+                    set.Add(name);
+                }
+
+                o.TreeNames = string.Join("\n", set.OrderBy(x => x, System.StringComparer.Ordinal));
+            })));
             AddBinding(new TriggerBinding(kGroup, "optimize", () => m_Tool.RequestOptimize()));
             AddBinding(new TriggerBinding<int>(kGroup, "setMaxArea", n =>
             {
@@ -493,7 +723,13 @@ namespace BlockBuilder
                 }
             }
 
-            string listsKey = $"{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{options.CheckedItems}";
+            // Tree Controller may save a set while the panel is open: look at the folder now and then.
+            if (m_Tool.IsActive && options.TreeFill && ++m_TreeSetFrame % 120 == 0)
+            {
+                m_TreeSetStamp = TreeSetStamp() + "|" + string.Join(",", ReadTreeSets().Select(x => x.Id + x.Names.Count));
+            }
+
+            string listsKey = $"{m_TreeSetStamp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{options.CheckedItems}|{options.TreeNames}|{m_Catalog.Trees.Count}";
             if (listsKey != m_ListsKey)
             {
                 m_ListsKey = listsKey;
@@ -531,6 +767,9 @@ namespace BlockBuilder
             Prop(sb, "brush", (int)BuilderTool.BrushRadius(o));
             Prop(sb, "density", (int)o.Density);
             Prop(sb, "maxArea", BuilderTool.MaxAreaOf(o));
+            Prop(sb, "treeFill", o.TreeFill);
+            Prop(sb, "treeSpacing", BuilderTool.TreeSpacingOf(o));
+            Prop(sb, "trees", m_Tool.PlannedTrees);
             Prop(sb, "sizeOrder", o.SizeOrderMode);
             Prop(sb, "sizeKey", o.SizeKeyMode);
             Prop(sb, "overlapSide", o.OverlapSide);
@@ -593,6 +832,40 @@ namespace BlockBuilder
                     Prop(sb, "checked", o.Checked.Contains(entry.Prefab), last: true);
                     sb.Append('}');
                 }
+            }
+
+            sb.Append("],\"trees\":[");
+            var treeNames = new System.Collections.Generic.HashSet<string>((o.TreeNames ?? string.Empty).Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries));
+            for (int i = 0; i < m_Catalog.Trees.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.Append(',');
+                }
+
+                var tree = m_Catalog.Trees[i];
+                sb.Append('{');
+                Prop(sb, "name", tree.Name);
+                Prop(sb, "thumb", Thumb(tree.Name, tree.Prefab));
+                Prop(sb, "checked", treeNames.Contains(tree.Name), last: true);
+                sb.Append('}');
+            }
+
+            sb.Append("],\"treeSets\":[");
+            var known = new System.Collections.Generic.HashSet<string>(m_Catalog.Trees.Select(t => t.Name));
+            bool firstSet = true;
+            foreach (var set in ReadTreeSets())
+            {
+                if (!firstSet)
+                {
+                    sb.Append(',');
+                }
+
+                firstSet = false;
+                sb.Append('{');
+                Prop(sb, "id", set.Id);
+                Prop(sb, "count", set.Names.Count(known.Contains), last: true);
+                sb.Append('}');
             }
 
             sb.Append("]}");
