@@ -978,3 +978,55 @@ $radius: 6rem;
     height: 10rem;
     background-color: $muted;
 }
+
+.thumb {
+    flex: none;
+    width: 40rem;
+    height: 30rem;
+    margin-right: 8rem;
+    object-fit: contain;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 3rem;
+}
+
+.thumbBlank {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.previewBox {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 96rem;
+    margin-top: 6rem;
+    padding: 6rem 10rem;
+    background-color: $surface;
+    border-radius: $radius;
+}
+
+.previewImage {
+    flex: none;
+    width: 120rem;
+    height: 84rem;
+    margin-right: 12rem;
+    object-fit: contain;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 4rem;
+}
+
+.previewText {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    font-size: 12rem;
+    color: $text;
+}
+
+.previewName {
+    max-width: 200rem;
+    margin-bottom: 4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

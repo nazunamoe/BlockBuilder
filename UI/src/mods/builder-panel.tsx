@@ -2,7 +2,7 @@ import { useValue } from "cs2/api";
 import { getModule } from "cs2/modding";
 import { Scrollable } from "cs2/ui";
 import { useEffect, useRef, useState } from "react";
-import { actions, BuilderState, DENSITY, Lists, listsBinding, parseLists, parseSearch, parseState, Search, searchBinding, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
+import { actions, BuilderState, DENSITY, EntryInfo, Lists, listsBinding, parseLists, parseSearch, parseState, Search, searchBinding, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
 import { T } from "mods/texts";
 import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, SizeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
 import styles from "./builder-panel.module.scss";
@@ -181,8 +181,35 @@ function ListPicker({ state, lists, t }: { state: BuilderState; lists: Lists; t:
 }
 
 /** The buildings of the current list: pick one to Shift+click, tick to fill with, remove with the X. */
+/** Building picture from the game's own thumbnails; a blank tile when it has none. */
+function Thumb({ src, className }: { src: string; className: string }) {
+    const [bad, setBad] = useState(false);
+    useEffect(() => setBad(false), [src]);
+    return src && !bad ? <img className={className} src={src} onError={() => setBad(true)} /> : <div className={`${className} ${styles.thumbBlank}`} />;
+}
+
+/** Larger picture of the hovered row (fixed height, so the list does not jump). */
+function PreviewBox({ item, t }: { item: { name: string; size: string; thumb: string } | null; t: Tr }) {
+    return (
+        <div className={styles.previewBox}>
+            {item ? (
+                <>
+                    <Thumb src={item.thumb} className={styles.previewImage} />
+                    <div className={styles.previewText}>
+                        <span className={styles.previewName}>{item.name}</span>
+                        <span className={styles.badge}>{item.size}</span>
+                    </div>
+                </>
+            ) : (
+                <span className={styles.note}>{t("previewHint")}</span>
+            )}
+        </div>
+    );
+}
+
 function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void }) {
     const [confirmClear, setConfirmClear] = useState(false);
+    const [hover, setHover] = useState<EntryInfo | null>(null);
     const onlyChecked = state.scope === 1;
     const hasList = lists.palettes[state.palette] !== undefined;
 
@@ -243,12 +270,14 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
             ) : (
+                <>
                 <Scrollable className={styles.itemList} vertical>
                     {lists.entries.map((e, i) => {
                         return (
-                            <div key={i} className={`${styles.itemRow} ${e.loaded ? "" : styles.dim}`}>
+                            <div key={i} className={`${styles.itemRow} ${e.loaded ? "" : styles.dim}`} onMouseEnter={() => setHover(e)} onMouseLeave={() => setHover(null)}>
                                 {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
                                 <div className={styles.itemName}>
+                                    <Thumb src={e.thumb} className={styles.thumb} />
                                     <span className={styles.name}>{e.name}</span>
                                     <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
                                 </div>
@@ -259,6 +288,8 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                         );
                     })}
                 </Scrollable>
+                <PreviewBox item={hover} t={t} />
+                </>
             )}
         </>
     );
@@ -267,6 +298,7 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
 function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void }) {
     // Start from the text the C# side still filters by (it survives a UI reload).
     const [query, setQuery] = useState<string | null>(null);
+    const [hover, setHover] = useState<{ name: string; size: string; thumb: string } | null>(null);
     const onQuery = (s: string) => {
         setQuery(s);
         actions.setSearchText(s);
@@ -333,8 +365,9 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
             ) : (
                 <Scrollable className={styles.itemList} vertical>
                     {search.results.map((r) => (
-                        <div key={r.name} className={styles.itemRow}>
+                        <div key={r.name} className={styles.itemRow} onMouseEnter={() => setHover(r)} onMouseLeave={() => setHover(null)}>
                             <div className={styles.itemName}>
+                                <Thumb src={r.thumb} className={styles.thumb} />
                                 <span className={styles.name}>{r.name}</span>
                                 <span className={styles.badge}>{r.size}</span>
                             </div>
@@ -351,6 +384,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                     ))}
                 </Scrollable>
             )}
+            <PreviewBox item={hover} t={t} />
         </>
     );
 }
@@ -405,6 +439,30 @@ function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
                         </div>
                     </div>
                 )}
+            </Group>
+
+            <Group title={t("sizeOrder")}>
+                <Segmented
+                    value={state.sizeOrder}
+                    onChange={actions.setSizeOrder}
+                    options={[
+                        { value: 0, label: t("sizeMixed") },
+                        { value: 1, label: t("sizeLarge") },
+                        { value: 2, label: t("sizeSmall") },
+                    ]}
+                />
+                {state.sizeOrder !== 0 && (
+                    <Segmented
+                        value={state.sizeKey}
+                        onChange={actions.setSizeKey}
+                        options={[
+                            { value: 0, label: t("sizeKeyArea") },
+                            { value: 1, label: t("sizeKeyWidth") },
+                            { value: 2, label: t("sizeKeyDepth") },
+                        ]}
+                    />
+                )}
+                <div className={styles.note}>{t("sizeOrderHint")}</div>
             </Group>
 
             <Group title={t("options")}>

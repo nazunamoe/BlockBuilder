@@ -177,6 +177,14 @@ namespace BlockBuilder
         [SettingsUIHidden]
         public bool StopAtRoads { get; set; }
 
+        /// <summary>Which lot the fill tries first: 0 mixed, 1 largest, 2 smallest. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int SizeOrderMode { get; set; }
+
+        /// <summary>What size means for the order: 0 area, 1 width, 2 depth. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int SizeKeyMode { get; set; }
+
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public FillDensity Density { get; set; }
 

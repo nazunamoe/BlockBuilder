@@ -24,6 +24,8 @@ namespace BlockBuilder.Core
             public List<Vec2> Poly;
             public LayoutOptions Options;
             public Random Rng;
+            /// <summary>Items placed last, newest at the end; sized orders avoid repeating them.</summary>
+            public readonly List<string> Recent = new List<string>();
             /// <summary>Lots and buildings: may be overlapped by the overlap allowances.</summary>
             public readonly List<Obb> Obstacles = new List<Obb>();
             /// <summary>Roads: never overlapped.</summary>
@@ -151,10 +153,19 @@ namespace BlockBuilder.Core
             return new Obb(center, -n, width, depth);
         }
 
+        private const int kRecentKept = 12;
+
+        private static double SizeOf(PaletteItem i, SizeKey key) => key == SizeKey.Width ? i.Width : key == SizeKey.Depth ? i.Depth : i.Width * i.Depth;
+
         private static void Count(Context ctx, string id)
         {
             ctx.Counts.TryGetValue(id, out int n);
             ctx.Counts[id] = n + 1;
+            ctx.Recent.Add(id);
+            if (ctx.Recent.Count > kRecentKept)
+            {
+                ctx.Recent.RemoveAt(0);
+            }
         }
 
         private static bool Available(Context ctx, PaletteItem item)
@@ -170,6 +181,16 @@ namespace BlockBuilder.Core
 
         private static IEnumerable<PaletteItem> Order(Context ctx, List<PaletteItem> candidates)
         {
+            if (ctx.Options.Order != SizeOrder.Mixed)
+            {
+                foreach (var c in SizedOrder(ctx, candidates))
+                {
+                    yield return c;
+                }
+
+                yield break;
+            }
+
             double total = candidates.Sum(c => c.Weight);
             double r = ctx.Rng.NextDouble() * total;
             PaletteItem first = candidates[candidates.Count - 1];
@@ -185,6 +206,44 @@ namespace BlockBuilder.Core
 
             yield return first;
             foreach (var c in candidates.Where(c => c != first).OrderByDescending(c => c.Width).ThenBy(c => c.Id, StringComparer.Ordinal))
+            {
+                yield return c;
+            }
+        }
+
+        /// <summary>
+        /// Biggest or smallest first by the chosen size. Items used recently go to the back, so the
+        /// next lot is the next best size instead of the same building again (they still serve as the
+        /// fallback when nothing else fits).
+        /// </summary>
+        /// <summary>Same value on every run and runtime, so a seed always lays out the same.</summary>
+        private static uint StableHash(string id, int seed)
+        {
+            uint h = 2166136261u ^ (uint)seed;
+            foreach (char ch in id)
+            {
+                h = (h ^ ch) * 16777619u;
+            }
+
+            return h;
+        }
+
+        private static IEnumerable<PaletteItem> SizedOrder(Context ctx, List<PaletteItem> candidates)
+        {
+            var key = ctx.Options.SizeBy;
+            bool large = ctx.Options.Order == SizeOrder.LargeFirst;
+            int seed = ctx.Options.Seed;
+            var ordered = (large ? candidates.OrderByDescending(c => SizeOf(c, key)) : candidates.OrderBy(c => SizeOf(c, key)))
+                .ThenBy(c => StableHash(c.Id, seed))
+                .ThenBy(c => c.Id, StringComparer.Ordinal)
+                .ToList();
+            // The newest uses weigh most: an item used just now goes behind one used a while ago.
+            foreach (var c in ordered.Where(c => !ctx.Recent.Contains(c.Id)))
+            {
+                yield return c;
+            }
+
+            foreach (var c in ordered.Where(c => ctx.Recent.Contains(c.Id)).OrderBy(c => ctx.Recent.LastIndexOf(c.Id)))
             {
                 yield return c;
             }

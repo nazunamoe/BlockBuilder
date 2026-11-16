@@ -29,11 +29,41 @@ namespace BlockBuilder
 
         public override GameMode gameMode => GameMode.Game;
 
+        private Game.UI.ImageSystem m_Images;
+        private readonly System.Collections.Generic.Dictionary<string, string> m_Thumbs = new System.Collections.Generic.Dictionary<string, string>();
+
+        /// <summary>The game's thumbnail URL for a building (what its toolbar shows); empty when it has none.</summary>
+        private string Thumb(BuildingEntry b)
+        {
+            if (b == null)
+            {
+                return string.Empty;
+            }
+
+            if (!m_Thumbs.TryGetValue(b.Name, out var url))
+            {
+                try
+                {
+                    url = m_Images.GetThumbnail(b.Prefab) ?? string.Empty;
+                }
+                catch (System.Exception e)
+                {
+                    Mod.log.Warn($"thumbnail of '{b.Name}' failed: {e.Message}");
+                    url = string.Empty;
+                }
+
+                m_Thumbs[b.Name] = url;
+            }
+
+            return url;
+        }
+
         protected override void OnCreate()
         {
             base.OnCreate();
             m_Tool = World.GetOrCreateSystemManaged<BuilderTool>();
             m_Catalog = World.GetOrCreateSystemManaged<CatalogSystem>();
+            m_Images = World.GetOrCreateSystemManaged<Game.UI.ImageSystem>();
 
             AddBinding(m_State = new ValueBinding<string>(kGroup, "state", "{}"));
             AddBinding(m_Lists = new ValueBinding<string>(kGroup, "lists", "{\"palettes\":[],\"entries\":[]}"));
@@ -84,6 +114,8 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<float>(kGroup, "setOverlapBack", v => EditIfAnarchy(o => o.OverlapBack = HalfMetres(v, 16))));
             AddBinding(new TriggerBinding<float>(kGroup, "setCustomGap", v => Edit(o => o.CustomGap = HalfMetres(v, 8))));
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSizeOrder", n => Edit(o => o.SizeOrderMode = System.Math.Max(0, System.Math.Min(2, n)))));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSizeKey", n => Edit(o => o.SizeKeyMode = System.Math.Max(0, System.Math.Min(2, n)))));
             AddBinding(new TriggerBinding<bool>(kGroup, "setCrossRoads", b => Edit(o => o.StopAtRoads = !b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
@@ -360,6 +392,7 @@ namespace BlockBuilder
                 sb.Append('{');
                 Prop(sb, "name", b.Name);
                 Prop(sb, "size", $"{b.LotWidth}x{b.LotDepth}");
+                Prop(sb, "thumb", Thumb(b));
                 Prop(sb, "inList", inList.Contains(b.Name), last: true);
                 sb.Append('}');
             }
@@ -488,6 +521,8 @@ namespace BlockBuilder
             Prop(sb, "blocks", m_Tool.BlockCount);
             Prop(sb, "brush", (int)BuilderTool.BrushRadius(o));
             Prop(sb, "density", (int)o.Density);
+            Prop(sb, "sizeOrder", o.SizeOrderMode);
+            Prop(sb, "sizeKey", o.SizeKeyMode);
             Prop(sb, "overlapSide", o.OverlapSide);
             Prop(sb, "overlapBack", o.OverlapBack);
             Prop(sb, "customGap", o.CustomGap);
@@ -543,6 +578,7 @@ namespace BlockBuilder
                     sb.Append('{');
                     Prop(sb, "name", entry.Prefab);
                     Prop(sb, "size", building != null ? $"{building.LotWidth}x{building.LotDepth}" : "?");
+                    Prop(sb, "thumb", Thumb(building));
                     Prop(sb, "loaded", building != null || !m_Catalog.Ready);
                     Prop(sb, "checked", o.Checked.Contains(entry.Prefab), last: true);
                     sb.Append('}');

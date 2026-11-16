@@ -38,6 +38,20 @@ namespace BlockBuilder.Core
         FixedOnly,
     }
 
+    public enum SizeOrder
+    {
+        Mixed,
+        LargeFirst,
+        SmallFirst,
+    }
+
+    public enum SizeKey
+    {
+        Area,
+        Width,
+        Depth,
+    }
+
     public sealed class LayoutOptions
     {
         public FillMode Mode = FillMode.Fill;
@@ -65,6 +79,12 @@ namespace BlockBuilder.Core
 
         /// <summary>Empty metres left between neighbouring lots along a road (relaxed fill).</summary>
         public double Gap;
+
+        /// <summary>Which lot the fill tries first: random by weight, biggest first or smallest first.</summary>
+        public SizeOrder Order = SizeOrder.Mixed;
+
+        /// <summary>What "size" means for <see cref="Order"/>.</summary>
+        public SizeKey SizeBy = SizeKey.Area;
 
         /// <summary>Grid step for interior (no-road) items; independent of the frontage search step.</summary>
         public double InteriorStep = 8;

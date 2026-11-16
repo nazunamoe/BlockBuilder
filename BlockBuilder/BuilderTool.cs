@@ -612,7 +612,7 @@ namespace BlockBuilder
 
         /// <summary>The options that decide the layout (not the area, the pins or the brush).</summary>
         private static string OptionsKey(Setting o) =>
-            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
+            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{o.SizeOrderMode}|{o.SizeKeyMode}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
 
         /// <summary>
         /// Ctrl+left drag on a lot of the preview moves it: the lot follows the cursor, snapped against
@@ -837,7 +837,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -1160,6 +1160,8 @@ namespace BlockBuilder
                     OverlapSide = EffectiveSide(options),
                     OverlapBack = EffectiveBack(options),
                     Gap = DensityGap(options),
+                    Order = (SizeOrder)System.Math.Max(0, System.Math.Min(2, options.SizeOrderMode)),
+                    SizeBy = (SizeKey)System.Math.Max(0, System.Math.Min(2, options.SizeKeyMode)),
                     Step = DensityStep(options),
                 },
                 Fixed = m_Fixed.Concat(m_Frozen).Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),

@@ -27,6 +27,8 @@ export interface BuilderState {
     generateRoads: boolean;
     fillInterior: boolean;
     crossRoads: boolean;
+    sizeOrder: number;
+    sizeKey: number;
     blockLength: number;
     road: string;
     status: string;
@@ -42,6 +44,7 @@ export interface PaletteInfo {
 export interface EntryInfo {
     name: string;
     size: string;
+    thumb: string;
     loaded: boolean;
     checked: boolean;
 }
@@ -60,6 +63,7 @@ export const SNAP_ANGLE = 4; // StraightDirection
 export interface SearchResult {
     name: string;
     size: string;
+    thumb: string;
     inList: boolean;
 }
 
@@ -120,6 +124,8 @@ const emptyState: BuilderState = {
     generateRoads: false,
     fillInterior: false,
     crossRoads: true,
+    sizeOrder: 0,
+    sizeKey: 0,
     blockLength: 160,
     road: "",
     status: "",
@@ -182,6 +188,8 @@ export const actions = {
     setSearchDepth: (n: number) => trigger(GROUP, "setSearchDepth", n),
     setSearchDepthOp: (op: number) => trigger(GROUP, "setSearchDepthOp", op),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
+    setSizeOrder: (n: number) => trigger(GROUP, "setSizeOrder", n),
+    setSizeKey: (n: number) => trigger(GROUP, "setSizeKey", n),
     setCrossRoads: (b: boolean) => trigger(GROUP, "setCrossRoads", b),
     setFillInterior: (b: boolean) => trigger(GROUP, "setFillInterior", b),
     setBlockLength: (n: number) => trigger(GROUP, "setBlockLength", n),

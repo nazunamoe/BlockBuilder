@@ -41,6 +41,54 @@ namespace BlockBuilder.Core.Tests
             }
         }
 
+        private static LayoutResult SizedRow(SizeOrder order, SizeKey key, params PaletteItem[] items)
+        {
+            var request = new LayoutRequest
+            {
+                Boundary = Rect(0, 0, 200, 20),
+                ExistingRoads = { Road(-20, -4, 240, -4) },
+                Options = { Order = order, SizeBy = key },
+            };
+            request.Items.AddRange(items);
+            var result = LayoutEngine.Run(request);
+            AssertValid(request, result);
+            return result;
+        }
+
+        [Fact]
+        public void LargeFirst_StartsWithTheBiggestAndDoesNotRepeatWhileOthersFit()
+        {
+            var result = SizedRow(SizeOrder.LargeFirst, SizeKey.Width, Item("big", 4, 2), Item("mid", 3, 2), Item("small", 2, 2));
+            var row = result.Placements.OrderBy(p => p.Box.Center.X).Select(p => p.ItemId).ToList();
+            Assert.Equal("big", row[0]);
+            Assert.NotEqual(row[0], row[1]);
+            for (int i = 1; i < row.Count; i++)
+            {
+                Assert.NotEqual(row[i - 1], row[i]);
+            }
+        }
+
+        [Fact]
+        public void SmallFirst_StartsWithTheSmallestAndRotatesThroughTheSmall()
+        {
+            var result = SizedRow(SizeOrder.SmallFirst, SizeKey.Area, Item("a", 2, 2), Item("b", 2, 3), Item("c", 4, 2), Item("d", 5, 2));
+            var row = result.Placements.OrderBy(p => p.Box.Center.X).Select(p => p.ItemId).ToList();
+            Assert.Equal("a", row[0]);
+            for (int i = 1; i < row.Count; i++)
+            {
+                Assert.NotEqual(row[i - 1], row[i]);
+            }
+
+            Assert.True(row.Distinct().Count() >= 3);
+        }
+
+        [Fact]
+        public void SizedOrder_SingleItemStillFillsTheRow()
+        {
+            var result = SizedRow(SizeOrder.SmallFirst, SizeKey.Width, Item("only", 2, 2));
+            Assert.True(result.Placements.Count >= 10);
+        }
+
         [Fact]
         public void RowAlongRoad_IsFlushFacingRoadAtLotPitch()
         {
