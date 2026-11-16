@@ -11,7 +11,6 @@ export interface BuilderState {
     buildings: number;
     streets: number;
     palette: number;
-    designate: number;
     scope: number;
     fillRest: boolean;
     snapOff: number;
@@ -27,6 +26,7 @@ export interface BuilderState {
     anarchyOn: boolean;
     generateRoads: boolean;
     fillInterior: boolean;
+    crossRoads: boolean;
     blockLength: number;
     road: string;
     status: string;
@@ -104,7 +104,6 @@ const emptyState: BuilderState = {
     buildings: 0,
     streets: 0,
     palette: 0,
-    designate: 0,
     scope: 0,
     fillRest: true,
     snapOff: 0,
@@ -120,6 +119,7 @@ const emptyState: BuilderState = {
     anarchyOn: false,
     generateRoads: false,
     fillInterior: false,
+    crossRoads: true,
     blockLength: 160,
     road: "",
     status: "",
@@ -150,7 +150,6 @@ export const actions = {
     shuffle: () => trigger(GROUP, "shuffle"),
     reloadLists: () => trigger(GROUP, "reloadLists"),
     setPalette: (i: number) => trigger(GROUP, "setPalette", i),
-    setDesignate: (i: number) => trigger(GROUP, "setDesignate", i),
     setScope: (s: number) => trigger(GROUP, "setScope", s),
     setFillRest: (b: boolean) => trigger(GROUP, "setFillRest", b),
     toggleChecked: (i: number) => trigger(GROUP, "toggleChecked", i),
@@ -183,6 +182,7 @@ export const actions = {
     setSearchDepth: (n: number) => trigger(GROUP, "setSearchDepth", n),
     setSearchDepthOp: (op: number) => trigger(GROUP, "setSearchDepthOp", op),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
+    setCrossRoads: (b: boolean) => trigger(GROUP, "setCrossRoads", b),
     setFillInterior: (b: boolean) => trigger(GROUP, "setFillInterior", b),
     setBlockLength: (n: number) => trigger(GROUP, "setBlockLength", n),
 };

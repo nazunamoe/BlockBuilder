@@ -114,6 +114,23 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void BrushAcrossRoad_CrossRoadsOnPaintsBothSidesButNeverTheRoad()
+        {
+            var roads = Straight(new Vec2(-900, 0), new Vec2(900, 0));
+            var walled = new PaintArea(roads);
+            walled.BeginStroke(new Vec2(50, 25));
+            walled.Stroke(new Vec2(50, 25), new Vec2(50, -25), 18, erase: false);
+            Assert.False(walled.IsPainted(new Vec2(50, -25)));
+
+            var open = new PaintArea(roads);
+            Assert.True(open.BeginStroke(new Vec2(50, 25), 300, crossRoads: true));
+            open.Stroke(new Vec2(50, 25), new Vec2(50, -25), 18, erase: false);
+            Assert.True(open.IsPainted(new Vec2(50, 25)));
+            Assert.True(open.IsPainted(new Vec2(50, -25)));
+            Assert.False(open.IsPainted(new Vec2(50, 0)));
+        }
+
+        [Fact]
         public void PaintBesideDiagonalRoad_LotsLineTheRoad()
         {
             Vec2 dir = new Vec2(Math.Cos(Math.PI / 6), Math.Sin(Math.PI / 6));

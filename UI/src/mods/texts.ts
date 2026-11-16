@@ -83,6 +83,8 @@ export const T: { [key: string]: [string, string] } = {
     generateRoadsHint: ["For deep areas; ends join existing roads", "깊은 영역용, 끝은 기존 도로에 연결"],
     blockLength: ["Max block length", "최대 블록 길이"],
     roadType: ["Street type", "도로 종류"],
+    crossRoads: ["Paint across roads", "도로 넘어 칠하기"],
+    crossRoadsHint: ["Off: the brush stops at roads and never reaches the far side", "끄면 브러시가 도로에서 멈추고 반대편을 칠하지 않습니다"],
     fillInterior: ["Fill interior", "내부 채우기"],
     fillInteriorHint: ["Items that need no road (plazas, statues)", "도로가 필요 없는 항목 (광장, 조형물)"],
 

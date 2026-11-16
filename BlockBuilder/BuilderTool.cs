@@ -520,7 +520,7 @@ namespace BlockBuilder
                 m_StrokeFrames = 0;
                 m_StrokeStartVersion = m_Paint.Version;
                 m_LastPaint = m_Cursor.xz;
-                if (!m_StrokeErase && !m_Paint.BeginStroke(new Vec2(m_Cursor.x, m_Cursor.z)))
+                if (!m_StrokeErase && !m_Paint.BeginStroke(new Vec2(m_Cursor.x, m_Cursor.z), 300, !options.StopAtRoads))
                 {
                     m_StrokeActive = false;
                     Note("a stroke cannot start on a road; start on the land you want", "도로 위에서는 칠하기를 시작할 수 없습니다. 칠할 땅에서 시작하세요");
@@ -992,33 +992,73 @@ namespace BlockBuilder
             return DestroyDefinitions(m_DefinitionQuery, m_ToolOutputBarrier, deps);
         }
 
-        /// <summary>Shift+click: pin the selected palette entry against the nearest road.</summary>
+        /// <summary>
+        /// Shift+click: out of the list (or the checked items) pick the building that best fills the
+        /// free space at the cursor, i.e. the largest lot that still fits there flush against the
+        /// nearest road, and pin it.
+        /// </summary>
         private void Designate(Setting options)
         {
             var palette = PaletteStore.Get(options.ActivePalette);
-            if (palette == null || options.DesignateItem < 0 || options.DesignateItem >= palette.Entries.Count)
+            if (palette == null || palette.Entries.Count == 0)
             {
-                Note("choose an item to designate first", "지정할 항목을 먼저 고르세요");
+                Note("no list selected; create one first", "선택된 리스트가 없습니다. 리스트를 먼저 만드세요");
                 return;
             }
 
-            var entry = m_Catalog.FindBuilding(palette.Entries[options.DesignateItem].Prefab);
-            if (entry == null)
+            var chosen = options.Scope == ItemScope.Checked ? options.Checked : null;
+            var at = new Vec2(m_Cursor.x, m_Cursor.z);
+            var seen = new HashSet<string>();
+            string bestName = null;
+            Obb bestBox = default;
+            double bestArea = -1;
+            double bestDist = double.MaxValue;
+            int tried = 0;
+            foreach (var e in palette.Entries)
             {
-                Note($"'{palette.Entries[options.DesignateItem].Prefab}' is not loaded", $"'{palette.Entries[options.DesignateItem].Prefab}'이(가) 로드되지 않았습니다");
+                var entry = m_Catalog.FindBuilding(e.Prefab);
+                if (entry == null || !seen.Add(entry.Name) || (chosen != null && !chosen.Contains(entry.Name)))
+                {
+                    continue;
+                }
+
+                tried++;
+                double w = entry.LotWidth * 8;
+                double d = entry.LotDepth * 8;
+                var box = SnapLot(entry.Name, w, d, at, new Vec2(0, 1));
+                if (!LotFits(box, null))
+                {
+                    continue;
+                }
+
+                double area = w * d;
+                double dist = Vec2.Distance(box.Center, at);
+                if (area > bestArea + 1e-6 || (System.Math.Abs(area - bestArea) <= 1e-6 && dist < bestDist))
+                {
+                    bestName = entry.Name;
+                    bestBox = box;
+                    bestArea = area;
+                    bestDist = dist;
+                }
+            }
+
+            if (bestName == null)
+            {
+                if (tried == 0)
+                {
+                    Note("no loaded item in the list to place", "놓을 수 있는 항목이 리스트에 없습니다");
+                }
+                else
+                {
+                    Note("nothing in the list fits there: every building would overlap a building or a road", "그 자리에 맞는 건물이 없습니다 (모두 건물이나 도로와 겹침)");
+                }
+
                 return;
             }
 
-            var box = SnapLot(entry.Name, entry.LotWidth * 8, entry.LotDepth * 8, new Vec2(m_Cursor.x, m_Cursor.z), new Vec2(0, 1));
-            if (!LotFits(box, null))
-            {
-                Note("cannot place it there: it would overlap a building or a road", "그 자리에는 놓을 수 없습니다 (건물이나 도로와 겹침)");
-                return;
-            }
-
-            m_Fixed.Add(new Placement { ItemId = entry.Name, Box = box });
+            m_Fixed.Add(new Placement { ItemId = bestName, Box = bestBox });
             m_PlanKey = string.Empty;
-            Note($"designated {entry.Name} at {box.Center} ({m_Fixed.Count} total)", $"{entry.Name} 지정 (총 {m_Fixed.Count}개)");
+            Note($"placed {bestName} (best fit of {tried}, {m_Fixed.Count} total)", $"{bestName} 배치 (후보 {tried}개 중 가장 잘 맞음, 총 {m_Fixed.Count}개)");
         }
 
         private IEnumerable<RoadSegment> PlannedRoadSegments()

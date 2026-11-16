@@ -124,7 +124,7 @@ namespace BlockBuilder.Core
         /// crossing a road (within <paramref name="reach"/> metres) becomes the only paintable area for
         /// this stroke. Returns false when the stroke starts on a road (nothing can be painted).
         /// </summary>
-        public bool BeginStroke(Vec2 at, double reach = 300)
+        public bool BeginStroke(Vec2 at, double reach = 300, bool crossRoads = false)
         {
             var (si, sj) = CellAt(at);
             m_Allowed = new HashSet<long>();
@@ -138,6 +138,7 @@ namespace BlockBuilder.Core
             // Breadth-first over a list (Queue<T> is ambiguous between the game's mscorlib and System).
             var queue = new List<(int I, int J)> { (si, sj) };
             m_Allowed.Add(Key(si, sj));
+            var visited = new HashSet<long> { Key(si, sj) };
             for (int head = 0; head < queue.Count; head++)
             {
                 var (i, j) = queue[head];
@@ -151,13 +152,19 @@ namespace BlockBuilder.Core
                     }
 
                     long key = Key(ni, nj);
-                    if (m_Allowed.Contains(key) || IsRoad(ni, nj))
+                    bool road = IsRoad(ni, nj);
+                    if (visited.Contains(key) || (road && !crossRoads))
                     {
                         continue;
                     }
 
-                    m_Allowed.Add(key);
+                    // With crossRoads the road is traversed (land on its far side is reachable) but never painted.
+                    visited.Add(key);
                     queue.Add((ni, nj));
+                    if (!road)
+                    {
+                        m_Allowed.Add(key);
+                    }
                 }
             }
 

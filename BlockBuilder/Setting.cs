@@ -162,12 +162,6 @@ namespace BlockBuilder
 
         internal Core.FillMode PlacementMode => PlacedOnly ? Core.FillMode.FixedOnly : Core.FillMode.Fill;
 
-        /// <summary>Palette entry placed by Shift+click (designate mode).</summary>
-        [SettingsUIDropdown(typeof(Setting), nameof(GetDesignateItems))]
-        [SettingsUIValueVersion(typeof(Setting), nameof(GetListVersion))]
-        [SettingsUISection(kBuilderTab, kBuildGroup)]
-        public int DesignateItem { get; set; }
-
         /// <summary>Snap options (Game.Tools.Snap bits) turned off in the game's tool options panel. Default 0 = all on.</summary>
         [SettingsUIHidden]
         public int SnapOff { get; set; }
@@ -178,6 +172,10 @@ namespace BlockBuilder
         /// <summary>Brush radius in metres for painting; 0 means the default (16 m). Set in the panel.</summary>
         [SettingsUIHidden]
         public int BrushRadius { get; set; }
+
+        /// <summary>Inverted so the default (false) lets the brush paint across roads. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public bool StopAtRoads { get; set; }
 
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public FillDensity Density { get; set; }
@@ -305,26 +303,6 @@ namespace BlockBuilder
             return filter;
         }
 
-        public DropdownItem<int>[] GetDesignateItems()
-        {
-            var items = new List<DropdownItem<int>>();
-            var palette = PaletteStore.Get(ActivePalette);
-            if (palette != null)
-            {
-                for (int i = 0; i < palette.Entries.Count; i++)
-                {
-                    items.Add(new DropdownItem<int> { value = i, displayName = palette.Entries[i].Prefab });
-                }
-            }
-
-            if (items.Count == 0)
-            {
-                items.Add(new DropdownItem<int> { value = -1, displayName = "-" });
-            }
-
-            return items.ToArray();
-        }
-
         public DropdownItem<int>[] GetPaletteItems()
         {
             var items = new List<DropdownItem<int>>();
@@ -394,7 +372,6 @@ namespace BlockBuilder
             Scope = ItemScope.All;
             PlacedOnly = false;
             CheckedItems = string.Empty;
-            DesignateItem = 0;
             GenerateRoads = false;
             NewRoadName = "Small Road";
             MaxBlockLength = 160;

@@ -37,8 +37,6 @@ namespace BlockBuilder
             d[s.GetEnumValueLocaleID(ItemScope.Checked)] = ko ? "고른 항목만" : "Checked only";
             Opt(nameof(Setting.PlacedOnly), "Only Shift+clicked buildings", "On: build only what you placed with Shift+click; the rest stays empty.",
                 "Shift+클릭한 것만 짓기", "켜면 Shift+클릭으로 직접 놓은 건물만 짓고 나머지는 비워 둡니다.");
-            Opt(nameof(Setting.DesignateItem), "Item to designate", "After closing the area, Shift+click places this item flush against the nearest road; Shift+right click on a designated item removes it (elsewhere: the last one).",
-                "지정할 항목", "영역을 닫은 뒤 Shift+클릭하면 이 항목을 가장 가까운 도로에 붙여 놓습니다. 지정한 항목 위에서 Shift+오른쪽 클릭하면 그 항목을 지웁니다 (빈 곳에서는 마지막 항목).");
             d[s.GetEnumValueLocaleID(FillMode.Fill)] = ko ? "채우기" : "Fill";
             d[s.GetEnumValueLocaleID(FillMode.FixedOnly)] = ko ? "지정만" : "Designated only";
             Opt(nameof(Setting.Selection), "Area selection", "Paint: brush the area freely (left drag paints, right drag or Ctrl+drag erases). Roads are walls: they are never painted and the edge hugs the curb, curves included. Draw: click the corners yourself.",

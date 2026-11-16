@@ -51,10 +51,8 @@ namespace BlockBuilder
                 if (o.ActivePalette != i)
                 {
                     o.ActivePalette = i;
-                    o.DesignateItem = 0;
                 }
             })));
-            AddBinding(new TriggerBinding<int>(kGroup, "setDesignate", i => Edit(o => o.DesignateItem = i)));
             AddBinding(new TriggerBinding<int>(kGroup, "setScope", i => Edit(o => o.Scope = i == 1 ? ItemScope.Checked : ItemScope.All)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillRest", b => Edit(o => o.PlacedOnly = !b)));
             AddBinding(new TriggerBinding<int>(kGroup, "toggleChecked", i => Edit(o =>
@@ -86,6 +84,7 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<float>(kGroup, "setOverlapBack", v => EditIfAnarchy(o => o.OverlapBack = HalfMetres(v, 16))));
             AddBinding(new TriggerBinding<float>(kGroup, "setCustomGap", v => Edit(o => o.CustomGap = HalfMetres(v, 8))));
             AddBinding(new TriggerBinding<bool>(kGroup, "setGenerateRoads", b => Edit(o => o.GenerateRoads = b)));
+            AddBinding(new TriggerBinding<bool>(kGroup, "setCrossRoads", b => Edit(o => o.StopAtRoads = !b)));
             AddBinding(new TriggerBinding<bool>(kGroup, "setFillInterior", b => Edit(o => o.FillInterior = b)));
             AddBinding(new TriggerBinding<int>(kGroup, "setBlockLength", n => Edit(o => o.MaxBlockLength = System.Math.Max(64, System.Math.Min(400, n)))));
             AddBinding(new TriggerBinding<int>(kGroup, "setSelection", n =>
@@ -130,7 +129,6 @@ namespace BlockBuilder
 
                 palette.Entries.Clear();
                 PaletteStore.Update(options.ActivePalette);
-                Edit(o => o.DesignateItem = 0);
             }));
             AddBinding(new TriggerBinding<string>(kGroup, "removeItemByName", name =>
             {
@@ -191,7 +189,6 @@ namespace BlockBuilder
                 if (index >= 0)
                 {
                     o.ActivePalette = index;
-                    o.DesignateItem = 0;
                 }
             });
         }
@@ -263,7 +260,6 @@ namespace BlockBuilder
             Edit(o =>
             {
                 o.ActivePalette = System.Math.Max(0, System.Math.Min(o.ActivePalette, PaletteStore.All.Count - 1));
-                o.DesignateItem = 0;
             });
         }
 
@@ -278,7 +274,6 @@ namespace BlockBuilder
 
             palette.Entries.RemoveAt(index);
             PaletteStore.Update(options.ActivePalette);
-            Edit(o => o.DesignateItem = System.Math.Max(0, System.Math.Min(o.DesignateItem, palette.Entries.Count - 1)));
         }
 
         private static void AddItems(IEnumerable<string> names)
@@ -485,7 +480,6 @@ namespace BlockBuilder
             Prop(sb, "buildings", m_Tool.PlannedBuildings);
             Prop(sb, "streets", m_Tool.PlannedStreets);
             Prop(sb, "palette", o.ActivePalette);
-            Prop(sb, "designate", o.DesignateItem);
             Prop(sb, "scope", o.Scope == ItemScope.Checked ? 1 : 0);
             Prop(sb, "fillRest", !o.PlacedOnly);
             Prop(sb, "snapOff", o.SnapOff);
@@ -500,6 +494,7 @@ namespace BlockBuilder
             Prop(sb, "anarchyInstalled", AnarchyLink.Installed);
             Prop(sb, "anarchyOn", AnarchyLink.Enabled);
             Prop(sb, "generateRoads", o.GenerateRoads);
+            Prop(sb, "crossRoads", !o.StopAtRoads);
             Prop(sb, "fillInterior", o.FillInterior);
             Prop(sb, "blockLength", o.MaxBlockLength);
             Prop(sb, "road", o.NewRoadName ?? string.Empty);

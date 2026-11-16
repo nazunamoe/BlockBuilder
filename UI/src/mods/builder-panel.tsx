@@ -42,6 +42,7 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
                     ]}
                 />
                 {state.selection === 0 && <Stepper label={t("brush")} value={state.brush} unit="m" step={4} onChange={actions.setBrush} />}
+                {state.selection === 0 && <Switch value={state.crossRoads} onChange={actions.setCrossRoads} label={t("crossRoads")} hint={t("crossRoadsHint")} />}
             </div>
             <div className={styles.steps}>
                 {steps.map((s, i) => (
@@ -244,15 +245,13 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
             ) : (
                 <Scrollable className={styles.itemList} vertical>
                     {lists.entries.map((e, i) => {
-                        const selected = i === state.designate;
                         return (
-                            <div key={i} className={`${styles.itemRow} ${selected ? styles.rowOn : ""} ${e.loaded ? "" : styles.dim}`}>
+                            <div key={i} className={`${styles.itemRow} ${e.loaded ? "" : styles.dim}`}>
                                 {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
-                                <button className={styles.itemName} onClick={() => actions.setDesignate(i)}>
+                                <div className={styles.itemName}>
                                     <span className={styles.name}>{e.name}</span>
-                                    {selected && <span className={styles.tag}>{t("selected")}</span>}
                                     <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
-                                </button>
+                                </div>
                                 <button className={styles.removeButton} title={t("removeFromList")} onClick={() => actions.removeItem(i)}>
                                     <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
                                 </button>
