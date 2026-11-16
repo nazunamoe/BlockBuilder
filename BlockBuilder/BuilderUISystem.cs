@@ -128,6 +128,15 @@ namespace BlockBuilder
                     Edit(o => o.Selection = mode);
                 }
             }));
+            AddBinding(new TriggerBinding(kGroup, "optimize", () => m_Tool.RequestOptimize()));
+            AddBinding(new TriggerBinding<int>(kGroup, "setMaxArea", n =>
+            {
+                if (Mod.Options != null)
+                {
+                    Mod.Options.MaxArea = System.Math.Max(10000, System.Math.Min(500000, n));
+                    Mod.Options.ApplyAndSave();
+                }
+            }));
             AddBinding(new TriggerBinding(kGroup, "build", () => m_Tool.RequestApply()));
             // Brush size does not change the layout: save it without bumping the plan revision.
             AddBinding(new TriggerBinding<int>(kGroup, "setBrush", n =>
@@ -521,6 +530,7 @@ namespace BlockBuilder
             Prop(sb, "blocks", m_Tool.BlockCount);
             Prop(sb, "brush", (int)BuilderTool.BrushRadius(o));
             Prop(sb, "density", (int)o.Density);
+            Prop(sb, "maxArea", BuilderTool.MaxAreaOf(o));
             Prop(sb, "sizeOrder", o.SizeOrderMode);
             Prop(sb, "sizeKey", o.SizeKeyMode);
             Prop(sb, "overlapSide", o.OverlapSide);

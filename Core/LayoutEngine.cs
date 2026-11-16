@@ -51,7 +51,9 @@ namespace BlockBuilder.Core
             }
 
             result.Boundary = poly;
-            var ctx = new Context { Poly = poly, Options = options, Rng = new Random(options.Seed), Result = result };
+            int variant = Math.Max(0, options.Variant);
+            result.Variant = variant;
+            var ctx = new Context { Poly = poly, Options = options, Rng = new Random(options.Seed + (variant >> 2) * 104729), Result = result };
             ctx.Obstacles.AddRange(request.Obstacles);
 
             foreach (var item in request.Fixed)
@@ -92,7 +94,10 @@ namespace BlockBuilder.Core
             if (roadItems.Count > 0)
             {
                 double minWidth = roadItems.Min(i => i.Width);
-                foreach (var front in fronts.Where(f => f.Length + 1e-6 >= minWidth).OrderByDescending(f => f.Length))
+                var usable = fronts.Where(f => f.Length + 1e-6 >= minWidth);
+                // Long frontages first by default; variants let the short ones take the corners.
+                var ordered = (variant & 2) != 0 ? usable.OrderBy(f => f.Length) : usable.OrderByDescending(f => f.Length);
+                foreach (var front in ordered.ToList())
                 {
                     FillFrontage(ctx, front, roadItems);
                 }
@@ -154,6 +159,130 @@ namespace BlockBuilder.Core
         }
 
         private const int kRecentKept = 12;
+
+        /// <summary>
+        /// Unused frontage left at the end of a run of a given length when it is filled with the
+        /// available widths (unbounded knapsack on a 0.5 m grid). Mid-row obstacles are not known
+        /// here; the live fit check still decides every lot.
+        /// </summary>
+        private sealed class RowFit
+        {
+            private const double kRes = 0.5;
+            private readonly double[] m_Waste;
+            private readonly double m_Side;
+            private readonly double m_Gap;
+
+            public RowFit(List<PaletteItem> items, double length, LayoutOptions options)
+            {
+                m_Side = Math.Max(0, options.OverlapSide);
+                m_Gap = Math.Max(0, options.Gap);
+                int n = Math.Max(0, (int)Math.Floor(length / kRes)) + 1;
+                // The last lot needs its width; every lot before it uses its pitch (width - overlap + gap).
+                var pitches = items.Select(i => Math.Max(kRes, i.Width - m_Side + m_Gap)).Select(p => (int)Math.Round(p / kRes)).Where(p => p > 0).Distinct().ToArray();
+                var widths = items.Select(i => (int)Math.Ceiling(i.Width / kRes - 1e-6)).Distinct().ToArray();
+                var best = new int[n];
+                m_Waste = new double[n];
+                for (int len = 0; len < n; len++)
+                {
+                    int b = len;
+                    foreach (int w in widths)
+                    {
+                        if (w <= len && len - w < b)
+                        {
+                            b = len - w;
+                        }
+                    }
+
+                    foreach (int p in pitches)
+                    {
+                        if (p <= len && best[len - p] < b)
+                        {
+                            b = best[len - p];
+                        }
+                    }
+
+                    best[len] = b;
+                    m_Waste[len] = b * kRes;
+                }
+            }
+
+            /// <summary>Road left unused if this item goes here with <paramref name="left"/> metres to go.</summary>
+            public double WasteAfter(double left, PaletteItem item)
+            {
+                double after = left - Math.Max(kRes, item.Width - m_Side + m_Gap);
+                if (after < 0)
+                {
+                    // The item ends the run: what is left past it.
+                    return Math.Round(Math.Max(0, left - item.Width) / kRes) * kRes;
+                }
+
+                int k = Math.Min(m_Waste.Length - 1, (int)Math.Floor(after / kRes));
+                return m_Waste[k];
+            }
+        }
+
+        /// <summary>
+        /// Lays the request out in <paramref name="variants"/> variants (variant 0 is the plain fill,
+        /// so the winner is never worse than it) and keeps the highest <see cref="Score"/>.
+        /// Deterministic: the same request always gives the same winner.
+        /// </summary>
+        public static LayoutResult RunBest(LayoutRequest request, int variants)
+        {
+            var baseOptions = request.Options ?? new LayoutOptions();
+            LayoutResult best = null;
+            double bestScore = double.NegativeInfinity;
+            for (int v = 0; v < Math.Max(1, variants); v++)
+            {
+                var options = baseOptions.Clone();
+                options.Variant = v;
+                var trial = new LayoutRequest
+                {
+                    Boundary = request.Boundary,
+                    ExistingRoads = request.ExistingRoads,
+                    Obstacles = request.Obstacles,
+                    Items = request.Items,
+                    Fixed = request.Fixed.Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
+                    Options = options,
+                };
+                var result = Run(trial);
+                double score = Score(result);
+                if (score > bestScore + 1e-6)
+                {
+                    best = result;
+                    bestScore = score;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Higher is better: lot area filled (least empty space first), minus a little for each pair
+        /// of identical buildings side by side on the same road.
+        /// </summary>
+        public static double Score(LayoutResult result)
+        {
+            double area = 0;
+            int repeats = 0;
+            Placement prev = null;
+            foreach (var p in result.Placements)
+            {
+                if (p.IsFixed)
+                {
+                    continue;
+                }
+
+                area += p.Box.Width * p.Box.Depth;
+                if (prev != null && prev.ItemId == p.ItemId && prev.FrontageRoadId == p.FrontageRoadId && Vec2.Distance(prev.Box.Center, p.Box.Center) < (prev.Box.Width + p.Box.Width) * 0.75)
+                {
+                    repeats++;
+                }
+
+                prev = p;
+            }
+
+            return area - repeats * 8;
+        }
 
         private static double SizeOf(PaletteItem i, SizeKey key) => key == SizeKey.Width ? i.Width : key == SizeKey.Depth ? i.Depth : i.Width * i.Depth;
 
@@ -292,6 +421,8 @@ namespace BlockBuilder.Core
 
         private static void FillFrontage(Context ctx, Frontage front, List<PaletteItem> items)
         {
+            bool reverse = (Math.Max(0, ctx.Options.Variant) & 1) != 0;
+            var fit = ctx.Options.FitRows ? new RowFit(items, front.Length, ctx.Options) : null;
             double t = 0;
             // Right after a lot, search finely: on the inside of a bend the next lot only fits a
             // little further on (the backs converge), and a full step would waste most of a lot.
@@ -308,14 +439,23 @@ namespace BlockBuilder.Core
                 // Fit depends only on lot size, so each size is tested once per position; large
                 // palettes have hundreds of entries but only a few dozen sizes.
                 var failed = new HashSet<(double, double)>();
-                foreach (var item in Order(ctx, candidates))
+                var order = Order(ctx, candidates);
+                if (fit != null)
+                {
+                    // Stable sort: within the same leftover the size order and the no-repeat rule decide.
+                    double left = front.Length - t;
+                    order = order.ToList().OrderBy(i => fit.WasteAfter(left, i));
+                }
+
+                foreach (var item in order)
                 {
                     if (!failed.Add((item.Width, item.Depth)))
                     {
                         continue;
                     }
 
-                    var box = front.LotAt(t, item.Width, item.Depth);
+                    // Reversed variants walk the road from its other end (same rules, other start).
+                    var box = reverse ? front.LotAt(front.Length - t - item.Width, item.Width, item.Depth) : front.LotAt(t, item.Width, item.Depth);
                     if (!Polygon.ContainsObb(ctx.Poly, box, kFit) || !Free(ctx, box))
                     {
                         continue;

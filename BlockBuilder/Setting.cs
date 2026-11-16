@@ -185,6 +185,14 @@ namespace BlockBuilder
         [SettingsUIHidden]
         public int SizeKeyMode { get; set; }
 
+        /// <summary>Largest area (square metres) that may be drawn or painted; 0 means the default. Set in the panel.</summary>
+        [SettingsUIHidden]
+        public int MaxArea { get; set; }
+
+        /// <summary>Layout variant found by the last Optimize (0 = plain fill). Set by the tool.</summary>
+        [SettingsUIHidden]
+        public int VariantIndex { get; set; }
+
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public FillDensity Density { get; set; }
 

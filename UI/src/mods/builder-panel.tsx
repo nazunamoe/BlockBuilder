@@ -476,6 +476,8 @@ function PlacementSettings({ state, t }: { state: BuilderState; t: Tr }) {
                         </div>
                     </div>
                 )}
+                <Stepper label={t("maxArea")} value={state.maxArea} unit="㎡" step={10000} onChange={actions.setMaxArea} />
+                <div className={styles.note}>{t("maxAreaHint")}</div>
                 <Switch value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} hint={t("fillInteriorHint")} />
             </Group>
 
@@ -576,6 +578,9 @@ export const BuilderPanel = () => {
             <div className={styles.footer}>
                 <button className={`${styles.button} ${styles.primary}`} disabled={!state.planned || state.buildings + state.streets === 0} onClick={actions.build}>
                     {t("build")}
+                </button>
+                <button className={styles.button} disabled={!state.planned} onClick={actions.optimize} title={t("optimizeHint")}>
+                    {t("optimize")}
                 </button>
                 <button className={styles.button} onClick={actions.shuffle}>
                     {t("shuffle")}

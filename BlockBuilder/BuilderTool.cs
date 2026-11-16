@@ -383,6 +383,14 @@ namespace BlockBuilder
                 {
                     if (m_Points.Count >= 3 && (math.distance(m_Cursor.xz, m_Points[0].xz) < kCloseDistance || math.distance(m_Snapped.xz, m_Points[0].xz) < 0.5f))
                     {
+                        double drawn = System.Math.Abs(Polygon.SignedArea(m_Points.Select(p => new Vec2(p.x, p.z)).ToList()));
+                        if (drawn > MaxAreaOf(options))
+                        {
+                            Note($"area {drawn:0} m2 is over the {MaxAreaOf(options)} m2 limit; draw a smaller area or raise the limit in the panel", $"영역 {drawn:0}㎡가 제한 {MaxAreaOf(options)}㎡를 넘습니다. 더 작게 그리거나 패널에서 제한을 올리세요");
+                            DrawOverlay();
+                            return inputDeps;
+                        }
+
                         m_State = State.Planned;
                         m_PlanKey = string.Empty;
                         m_Frozen.Clear();
@@ -517,6 +525,7 @@ namespace BlockBuilder
                 EnsurePaint(m_Cursor.xz);
                 m_StrokeErase = mouse.rightButton.wasPressedThisFrame || ctrl;
                 m_StrokeActive = true;
+                m_LimitNoted = false;
                 m_StrokeFrames = 0;
                 m_StrokeStartVersion = m_Paint.Version;
                 m_LastPaint = m_Cursor.xz;
@@ -533,6 +542,7 @@ namespace BlockBuilder
                 return;
             }
 
+            m_Paint.MaxCells = (int)(MaxAreaOf(options) / (m_Paint.Cell * m_Paint.Cell));
             float r = BrushRadius(options);
             var from = new Vec2(m_LastPaint.x, m_LastPaint.y);
             var to = new Vec2(m_Cursor.x, m_Cursor.z);
@@ -541,8 +551,16 @@ namespace BlockBuilder
                 m_LiveRegions = m_Paint.Regions(rings: false); // outlines only while painting; planned at the end
             }
 
+            if (!m_StrokeErase && m_Paint.AtLimit && !m_LimitNoted)
+            {
+                m_LimitNoted = true;
+                Note($"paint limit reached ({MaxAreaOf(options)} m2); raise it in the panel to paint more", $"칠하기 제한({MaxAreaOf(options)}㎡)에 도달했습니다. 더 칠하려면 패널에서 제한을 올리세요");
+            }
+
             m_LastPaint = m_Cursor.xz;
         }
+
+        private bool m_LimitNoted;
 
         /// <summary>Ends a stroke once no mouse button is held (also when released over the panel).</summary>
         private void FinishStrokeIfReleased(UnityEngine.InputSystem.Mouse mouse)
@@ -612,7 +630,7 @@ namespace BlockBuilder
 
         /// <summary>The options that decide the layout (not the area, the pins or the brush).</summary>
         private static string OptionsKey(Setting o) =>
-            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{o.SizeOrderMode}|{o.SizeKeyMode}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
+            $"{o.ActivePalette}|{o.Seed}|{o.GenerateRoads}|{o.NewRoadName}|{o.MaxBlockLength}|{o.FillInterior}|{o.PlacementMode}|{o.Scope}|{o.CheckedItems?.Length}|{o.Density}|{o.SizeOrderMode}|{o.SizeKeyMode}|{o.VariantIndex}|{EffectiveSide(o)}|{EffectiveBack(o)}|{DensityGap(o)}";
 
         /// <summary>
         /// Ctrl+left drag on a lot of the preview moves it: the lot follows the cursor, snapped against
@@ -837,7 +855,7 @@ namespace BlockBuilder
         }
 
         private string PlanKey(Setting options) =>
-            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
+            $"{options.ActivePalette}|{options.Seed}|{options.GenerateRoads}|{options.NewRoadName}|{options.MaxBlockLength}|{options.FillInterior}|{options.PlacementMode}|{options.Scope}|{options.CheckedItems?.Length}|{options.Density}|{options.SizeOrderMode}|{options.SizeKeyMode}|{options.VariantIndex}|{EffectiveSide(options)}|{EffectiveBack(options)}|{DensityGap(options)}|{m_Fixed.Count}|{m_Frozen.Count}|{m_MoveVersion}|{options.Revision}";
 
         private JobHandle ReplanIfChanged(Setting options, JobHandle deps)
         {
@@ -1114,6 +1132,28 @@ namespace BlockBuilder
             }
         }
 
+        private bool m_OptimizeRequested;
+
+        /// <summary>Panel button: compare several layouts of the current area and keep the best.</summary>
+        internal void RequestOptimize()
+        {
+            m_OptimizeRequested = true;
+            m_PlanKey = string.Empty;
+        }
+
+        internal const int kDefaultMaxArea = 60000;
+
+        internal static int MaxAreaOf(Setting o) => o.MaxArea > 0 ? o.MaxArea : kDefaultMaxArea;
+
+        /// <summary>Layouts compared by Optimize: fewer for big areas, so the search stays quick.</summary>
+        private int OptimizeVariants()
+        {
+            double area = m_Picked || Mod.Options?.Selection == AreaSelect.Paint
+                ? (m_Paint?.PaintedArea ?? 0)
+                : System.Math.Abs(Polygon.SignedArea(m_Points.Select(p => new Vec2(p.x, p.z)).ToList()));
+            return area <= 30000 ? 8 : area <= 80000 ? 4 : area <= 150000 ? 2 : 1;
+        }
+
         private JobHandle PlanAndSubmit(Setting options, JobHandle deps)
         {
             m_Submitted = 0;
@@ -1163,6 +1203,8 @@ namespace BlockBuilder
                     Order = (SizeOrder)System.Math.Max(0, System.Math.Min(2, options.SizeOrderMode)),
                     SizeBy = (SizeKey)System.Math.Max(0, System.Math.Min(2, options.SizeKeyMode)),
                     Step = DensityStep(options),
+                    FitRows = true,
+                    Variant = options.VariantIndex,
                 },
                 Fixed = m_Fixed.Concat(m_Frozen).Select(f => new Placement { ItemId = f.ItemId, Box = f.Box }).ToList(),
             };
@@ -1172,7 +1214,38 @@ namespace BlockBuilder
             m_LastObstacles = request.Obstacles;
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            m_Plan = m_Picked ? PlanBlocks(request) : LayoutEngine.Run(request);
+            int variants = m_OptimizeRequested ? OptimizeVariants() : 1;
+            m_OptimizeRequested = false;
+            if (variants > 1 && request.Fixed.Count == 0 && options.PlacementMode != FillMode.FixedOnly)
+            {
+                // Try the variants and keep the best; the winner is stored so normal replans repeat it in one pass.
+                LayoutResult best = null;
+                double bestScore = double.NegativeInfinity;
+                int bestVariant = 0;
+                for (int v = 0; v < variants; v++)
+                {
+                    request.Options.Variant = v;
+                    var trial = m_Picked ? PlanBlocks(request) : LayoutEngine.Run(request);
+                    double score = LayoutEngine.Score(trial);
+                    if (score > bestScore + 1e-6)
+                    {
+                        best = trial;
+                        bestScore = score;
+                        bestVariant = v;
+                    }
+                }
+
+                m_Plan = best;
+                options.VariantIndex = bestVariant;
+                options.ApplyAndSave();
+                m_PlanKey = PlanKey(options);
+                Note($"optimized: compared {variants} layouts, kept #{bestVariant + 1}", $"최적화: 배치 {variants}가지를 비교해 {bestVariant + 1}번을 골랐습니다");
+            }
+            else
+            {
+                request.Options.Variant = options.VariantIndex;
+                m_Plan = m_Picked ? PlanBlocks(request) : LayoutEngine.Run(request);
+            }
             m_PlanRings = m_Picked ? m_Regions.Select(x => x.Outline).ToList() : new List<List<Vec2>> { m_Plan.Boundary ?? new List<Vec2>() };
             if (options.PlacementMode == FillMode.FixedOnly && m_Fixed.Count == 0)
             {

@@ -27,6 +27,7 @@ export interface BuilderState {
     generateRoads: boolean;
     fillInterior: boolean;
     crossRoads: boolean;
+    maxArea: number;
     sizeOrder: number;
     sizeKey: number;
     blockLength: number;
@@ -124,6 +125,7 @@ const emptyState: BuilderState = {
     generateRoads: false,
     fillInterior: false,
     crossRoads: true,
+    maxArea: 60000,
     sizeOrder: 0,
     sizeKey: 0,
     blockLength: 160,
@@ -153,6 +155,8 @@ export function parseLists(json: string): Lists {
 export const actions = {
     toggle: () => trigger(GROUP, "toggle"),
     clearArea: () => trigger(GROUP, "clearArea"),
+    optimize: () => trigger(GROUP, "optimize"),
+    setMaxArea: (n: number) => trigger(GROUP, "setMaxArea", n),
     shuffle: () => trigger(GROUP, "shuffle"),
     reloadLists: () => trigger(GROUP, "reloadLists"),
     setPalette: (i: number) => trigger(GROUP, "setPalette", i),

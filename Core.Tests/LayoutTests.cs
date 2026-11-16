@@ -89,6 +89,87 @@ namespace BlockBuilder.Core.Tests
             Assert.True(result.Placements.Count >= 10);
         }
 
+        private static LayoutRequest RowRequest(double length, params PaletteItem[] items)
+        {
+            var request = new LayoutRequest
+            {
+                Boundary = Rect(0, 0, length, 20),
+                ExistingRoads = { Road(-20, -4, length + 40, -4) },
+            };
+            request.Items.AddRange(items);
+            return request;
+        }
+
+        private static double Covered(LayoutResult r) => r.Placements.Sum(p => p.Box.Width * p.Box.Depth);
+
+        [Fact]
+        public void FitRows_LeavesLessUnusedRoadThanGreedyAndNeverOverlaps()
+        {
+            // 40 m of road with 24 m and 16 m lots: greedy 24 then 16 fits, but 24+24 would not; mixed
+            // widths make the order matter. Fit rows must cover at least as much as the plain fill.
+            foreach (double length in new[] { 40.0, 56.0, 72.0, 88.0, 104.0 })
+            {
+                var request = RowRequest(length, Item("wide", 3, 2), Item("mid", 2, 2), Item("odd", 5, 2));
+                var plain = LayoutEngine.Run(request);
+                request.Options.FitRows = true;
+                var fit = LayoutEngine.Run(request);
+                AssertValid(request, fit);
+                Assert.True(Covered(fit) >= Covered(plain) - 1e-6, $"length {length}: {Covered(fit)} < {Covered(plain)}");
+            }
+        }
+
+        [Fact]
+        public void FitRows_FillsAnAwkwardRowExactly()
+        {
+            // 56 m = 5 cells + 2 cells; greedy "odd" first would leave a gap, an exact mix has none.
+            var request = RowRequest(56, Item("five", 5, 2), Item("two", 2, 2), Item("three", 3, 2));
+            request.Options.FitRows = true;
+            var result = LayoutEngine.Run(request);
+            AssertValid(request, result);
+            Assert.Equal(56, result.Placements.Sum(p => p.Box.Width), 6);
+        }
+
+        [Fact]
+        public void RunBest_IsNeverWorseThanPlainAndIsDeterministic()
+        {
+            var request = RowRequest(104, Item("a", 3, 2), Item("b", 2, 3), Item("c", 5, 2));
+            var plain = LayoutEngine.Run(request);
+            var best = LayoutEngine.RunBest(request, 8);
+            AssertValid(request, best);
+            Assert.True(LayoutEngine.Score(best) >= LayoutEngine.Score(plain) - 1e-6);
+
+            var again = LayoutEngine.RunBest(request, 8);
+            Assert.Equal(best.Variant, again.Variant);
+            Assert.Equal(best.Placements.Select(p => p.ItemId + p.Box.Center.X), again.Placements.Select(p => p.ItemId + p.Box.Center.X));
+        }
+
+        [Fact]
+        public void Variants_ProduceMoreThanOneLayout()
+        {
+            var request = RowRequest(104, Item("a", 3, 2), Item("b", 2, 3), Item("c", 5, 2));
+            var layouts = new HashSet<string>();
+            for (int v = 0; v < 4; v++)
+            {
+                request.Options.Variant = v;
+                var r = LayoutEngine.Run(request);
+                AssertValid(request, r);
+                layouts.Add(string.Join(";", r.Placements.OrderBy(p => p.Box.Center.X).Select(p => p.ItemId + "@" + Math.Round(p.Box.Center.X, 1))));
+            }
+
+            Assert.True(layouts.Count > 1);
+        }
+
+        [Fact]
+        public void RunBest_KeepsFixedLotsAndMaxCounts()
+        {
+            var request = RowRequest(104, Item("a", 3, 2, max: 2), Item("b", 2, 2));
+            request.Fixed.Add(new Placement { ItemId = "a", Box = new Obb(new Vec2(12, 8), new Vec2(0, -1), 24, 16) });
+            var result = LayoutEngine.RunBest(request, 4);
+            AssertValid(request, result);
+            Assert.True(result.Placements.Any(p => p.IsFixed && p.ItemId == "a"));
+            Assert.True(result.Placements.Count(p => p.ItemId == "a") <= 2);
+        }
+
         [Fact]
         public void RowAlongRoad_IsFlushFacingRoadAtLotPitch()
         {

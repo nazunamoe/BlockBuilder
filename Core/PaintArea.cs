@@ -44,6 +44,15 @@ namespace BlockBuilder.Core
         /// <summary>Bumped on every change of the painted cells.</summary>
         public int Version { get; private set; }
 
+        /// <summary>Most cells that may be painted (0 = no limit); painting stops there.</summary>
+        public int MaxCells { get; set; }
+
+        /// <summary>True when painting is stopped by <see cref="MaxCells"/>.</summary>
+        public bool AtLimit => MaxCells > 0 && m_Painted.Count >= MaxCells;
+
+        /// <summary>Painted area in square metres.</summary>
+        public double PaintedArea => m_Painted.Count * Cell * Cell;
+
         /// <summary>Painted cells as (column, row); used to carry the paint over when the roads are rebuilt.</summary>
         public IEnumerable<(int I, int J)> Cells => m_Painted.Select(Unkey).ToList();
 
@@ -207,7 +216,7 @@ namespace BlockBuilder.Core
                     {
                         changed |= m_Painted.Remove(key);
                     }
-                    else if (m_Allowed != null && m_Allowed.Contains(key) && m_Painted.Add(key))
+                    else if (m_Allowed != null && m_Allowed.Contains(key) && (MaxCells <= 0 || m_Painted.Count < MaxCells || m_Painted.Contains(key)) && m_Painted.Add(key))
                     {
                         m_StrokeCells.Add(key);
                         changed = true;

@@ -80,6 +80,18 @@ namespace BlockBuilder.Core
         /// <summary>Empty metres left between neighbouring lots along a road (relaxed fill).</summary>
         public double Gap;
 
+        /// <summary>
+        /// At each spot along a road, prefer the lot that leaves a run the other widths can fill
+        /// best, so rows end with as little unused frontage as possible.
+        /// </summary>
+        public bool FitRows;
+
+        /// <summary>
+        /// Geometric variation of the same fill (0 = plain): bit 0 fills each road from its other
+        /// end, bit 1 lets short frontages claim corners first, higher bits offset the seed.
+        /// </summary>
+        public int Variant;
+
         /// <summary>Which lot the fill tries first: random by weight, biggest first or smallest first.</summary>
         public SizeOrder Order = SizeOrder.Mixed;
 
@@ -153,5 +165,7 @@ namespace BlockBuilder.Core
         /// <summary>The boundary actually used (after curb snapping), counter-clockwise.</summary>
         public List<Vec2> Boundary = new List<Vec2>();
         public Dictionary<string, int> Counts = new Dictionary<string, int>();
+        /// <summary>Variant this result was laid out with (see <see cref="LayoutOptions.Variant"/>).</summary>
+        public int Variant;
     }
 }

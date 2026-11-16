@@ -131,6 +131,20 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void PaintLimit_StopsAddingCellsAndErasingStillWorks()
+        {
+            var paint = new PaintArea(Straight(new Vec2(-900, 0), new Vec2(900, 0)));
+            paint.MaxCells = 100;
+            paint.BeginStroke(new Vec2(50, 100));
+            paint.Stroke(new Vec2(0, 100), new Vec2(200, 100), 18, erase: false);
+            Assert.True(paint.AtLimit);
+            Assert.Equal(100, paint.Cells.Count());
+            Assert.True(paint.PaintedArea <= 100 * 4 + 1e-6);
+            paint.Stroke(new Vec2(0, 100), new Vec2(40, 100), 18, erase: true);
+            Assert.False(paint.AtLimit);
+        }
+
+        [Fact]
         public void PaintBesideDiagonalRoad_LotsLineTheRoad()
         {
             Vec2 dir = new Vec2(Math.Cos(Math.PI / 6), Math.Sin(Math.PI / 6));
