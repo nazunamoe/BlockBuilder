@@ -993,12 +993,53 @@ namespace BlockBuilder
         }
 
         /// <summary>
+        /// A lot at <paramref name="at"/> (flush against the nearest road); when it does not fit there it
+        /// slides along the road, up to its own width either way, so a gap next to the click is used.
+        /// </summary>
+        private bool TryFitNear(string itemId, double w, double d, Vec2 at, out Obb fit)
+        {
+            var first = SnapLot(itemId, w, d, at, new Vec2(0, 1));
+            if (LotFits(first, null))
+            {
+                fit = first;
+                return true;
+            }
+
+            // Along the frontage: perpendicular to the facing direction of the snapped lot.
+            var f = first.Forward;
+            var along = new Vec2(-f.Y, f.X);
+            for (double off = 1; off <= w; off += 1)
+            {
+                foreach (double sign in new[] { 1.0, -1.0 })
+                {
+                    var box = SnapLot(itemId, w, d, at + along * (off * sign), first.Forward);
+                    if (LotFits(box, null))
+                    {
+                        fit = box;
+                        return true;
+                    }
+                }
+            }
+
+            fit = first;
+            return false;
+        }
+
+        /// <summary>
         /// Shift+click: out of the list (or the checked items) pick the building that best fills the
         /// free space at the cursor, i.e. the largest lot that still fits there flush against the
         /// nearest road, and pin it.
         /// </summary>
+        /// <summary>Shift+click placement is switched off for now (set to true to bring it back).</summary>
+        private const bool kDesignateEnabled = false;
+
         private void Designate(Setting options)
         {
+            if (!kDesignateEnabled)
+            {
+                return;
+            }
+
             var palette = PaletteStore.Get(options.ActivePalette);
             if (palette == null || palette.Entries.Count == 0)
             {
@@ -1025,8 +1066,7 @@ namespace BlockBuilder
                 tried++;
                 double w = entry.LotWidth * 8;
                 double d = entry.LotDepth * 8;
-                var box = SnapLot(entry.Name, w, d, at, new Vec2(0, 1));
-                if (!LotFits(box, null))
+                if (!TryFitNear(entry.Name, w, d, at, out var box))
                 {
                     continue;
                 }
