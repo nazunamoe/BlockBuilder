@@ -11,6 +11,9 @@ BlockBuilder/Library/
 UI/node_modules/
 UI/build/
 
+# Packaged test builds
+dist/
+
 # OS / editor
 .DS_Store
 Thumbs.db
