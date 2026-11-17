@@ -1178,11 +1178,14 @@ $radius: 6rem;
 }
 
 .tile {
-    width: 124rem;
+    // Four to a row in the wide add view. Shares of the row instead of fixed rem widths: the
+    // scrollbar takes a few rem, and a fixed width that only just fits then drops a column.
+    width: 23.5%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    margin: 0 6rem 6rem 0;
+    margin: 0 1% 6rem 0;
     padding: 4rem;
     color: $text;
     background-color: $surface;
@@ -1271,9 +1274,10 @@ $radius: 6rem;
 }
 
 // List view in the normal-width panel: three smaller tiles a row.
+// Three to a row in the normal-width list (3 x (31.5% + 1.5%) leaves 1% spare).
 .tileSmall {
-    width: 104rem;
-    margin: 0 4rem 4rem 0;
+    width: 31.5%;
+    margin: 0 1.5% 4rem 0;
 }
 
 .tileImageSmall {
