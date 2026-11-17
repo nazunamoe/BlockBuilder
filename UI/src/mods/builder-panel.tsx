@@ -16,9 +16,12 @@ const MouseToolOptions: any = (() => {
     }
 })();
 
-const PANEL_WIDTH = 380;
-/** Wider while adding buildings, so the picture grid has room (like Find It). */
-const ADD_PANEL_WIDTH = 560;
+/** Landscape window: status and actions on the left, tabs on the right; adding buildings uses the full width. */
+const PANEL_WIDTH = 820;
+/** Tallest content area in rem, so the window stays short on any screen. */
+const PANE_MAX_REM = 520;
+/** Tabs row above the scrolling body, in rem (measured space the body gives up). */
+const TABS_REM = 40;
 const POS_KEY = "blockBuilder.panelPos";
 const TAB_KEY = "blockBuilder.tab";
 const VIEW_KEY = "blockBuilder.addView";
@@ -52,9 +55,9 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
             </div>
             <div className={styles.steps}>
                 {steps.map((s, i) => (
-                    <div key={i} className={`${styles.stepChip} ${i === current ? styles.stepCurrent : i < current ? styles.stepDone : ""}`}>
+                    <div key={i} title={s} className={`${styles.stepChip} ${i === current ? styles.stepCurrent : i < current ? styles.stepDone : ""}`}>
                         <span className={styles.stepNumber}>{i + 1}</span>
-                        {s}
+                        {i === current ? s : ""}
                     </div>
                 ))}
             </div>
@@ -93,6 +96,62 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
                     {w}
                 </div>
             ))}
+        </div>
+    );
+}
+
+/** Build and its helpers, stacked under the status in the left column. */
+function Actions({ state, t }: { state: BuilderState; t: Tr }) {
+    const [confirmUndo, setConfirmUndo] = useState(false);
+    return (
+        <div className={styles.actions}>
+            {confirmUndo && (
+                <div className={styles.prompt}>
+                    <div className={styles.promptLabel}>{t("confirmUndo")}</div>
+                    <div className={styles.promptRow}>
+                        <button
+                            className={`${styles.chip} ${styles.chipDanger}`}
+                            onClick={() => {
+                                actions.undoBuild();
+                                setConfirmUndo(false);
+                            }}
+                        >
+                            {t("undoBuild")}
+                        </button>
+                        <button className={styles.chip} onClick={() => setConfirmUndo(false)}>
+                            {t("cancel")}
+                        </button>
+                    </div>
+                </div>
+            )}
+            <button className={`${styles.actionButton} ${styles.actionWide} ${styles.primary}`} disabled={!state.planned || state.buildings + state.streets === 0} onClick={actions.build}>
+                {t("build")}
+            </button>
+            <div className={styles.actionGrid}>
+                <button className={`${styles.actionButton} ${styles.actionHalf}`} disabled={!state.planned} onClick={actions.optimize} title={t("optimizeHint")}>
+                    {t("optimize")}
+                </button>
+                <button className={`${styles.actionButton} ${styles.actionHalf}`} onClick={actions.shuffle}>
+                    {t("shuffle")}
+                </button>
+                <button className={`${styles.actionButton} ${styles.actionHalf}`} onClick={actions.clearArea}>
+                    {t("clear")}
+                </button>
+                <button
+                    className={`${styles.actionButton} ${styles.actionHalf}`}
+                    disabled={state.undoCount === 0 || state.undoing}
+                    title={t("undoHint")}
+                    onClick={() => {
+                        if (state.planned || state.buildings + state.streets > 0) {
+                            setConfirmUndo(true);
+                        } else {
+                            actions.undoBuild();
+                        }
+                    }}
+                >
+                    {t("undoBuild")}
+                </button>
+            </div>
         </div>
     );
 }
@@ -239,18 +298,7 @@ function ViewButtons({ view, setView, t }: { view: View; setView: (v: View) => v
     );
 }
 
-function ViewToggle({ view, setView, t }: { view: View; setView: (v: View) => void; t: Tr }) {
-    return (
-        <div className={styles.resultHeader}>
-            <span>{t("view")}</span>
-            <div className={styles.resultTools}>
-                <ViewButtons view={view} setView={setView} t={t} />
-            </div>
-        </div>
-    );
-}
-
-function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void }) {
+function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void; gridMax: number }) {
     const [confirmClear, setConfirmClear] = useState(false);
     // Hover previews a building; a click selects it for the weight and limit card below.
     const [hover, setHover] = useState<number | null>(null);
@@ -292,6 +340,8 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                         </button>
                     </>
                 )}
+                <span className={styles.toolbarSpacer} />
+                <ViewButtons view={view} setView={setView} t={t} />
             </div>
 
             {confirmClear && lists.entries.length > 0 && (
@@ -316,12 +366,13 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                 </div>
             )}
 
-            {lists.entries.length > 0 && <ViewToggle view={view} setView={setView} t={t} />}
-
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
-            ) : view === "grid" ? (
-                <Scrollable className={styles.gridList} vertical>
+            ) : (
+                <div className={styles.listPanes}>
+                    <div className={styles.listGrid}>
+            {view === "grid" ? (
+                <Scrollable className={styles.gridList} style={{ height: `${gridMax}px`, maxHeight: "none" }} vertical>
                     <div className={styles.grid}>
                         {lists.entries.map((e, i) => (
                             <div
@@ -363,7 +414,7 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                     </div>
                 </Scrollable>
             ) : (
-                <Scrollable className={styles.itemList} vertical>
+                <Scrollable className={styles.itemList} style={{ height: `${gridMax}px`, maxHeight: "none" }} vertical>
                     {lists.entries.map((e, i) => (
                         <div
                             key={i}
@@ -393,8 +444,12 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                     ))}
                 </Scrollable>
             )}
-
-            {lists.entries.length > 0 && <EntryDetail entry={shown} index={shownIndex} editable={shownIndex === selected} t={t} />}
+                    </div>
+                    <div className={styles.listDetail}>
+                        <EntryDetail entry={shown} index={shownIndex} editable={shownIndex === selected} t={t} />
+                    </div>
+                </div>
+            )}
         </>
     );
 }
@@ -424,7 +479,7 @@ function EntryDetail({ entry, index, editable, t }: { entry: EntryInfo | null; i
     return (
         <div className={styles.detailCard}>
             <div className={styles.detailTop}>
-                <Thumb src={entry.thumb} className={styles.previewImage} />
+                <Thumb src={entry.thumb} className={styles.detailImage} />
                 <div className={styles.previewText}>
                     <span className={styles.previewName}>{entry.label || entry.name}</span>
                     {entry.label && entry.label !== entry.name && <span className={styles.previewPrefab}>{entry.name}</span>}
@@ -479,7 +534,7 @@ function UseTile({ label, icon, count, on, onClick }: { label: string; icon: str
 }
 
 /** Catalog search that adds to the current list; replaces the list view until Back. */
-function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void }) {
+function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void; paneMax: number; rem: number }) {
     // Start from the text the C# side still filters by (it survives a UI reload).
     const [query, setQuery] = useState<string | null>(null);
     const [hover, setHover] = useState<Shown | null>(null);
@@ -493,7 +548,8 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
     const [view, setView] = useView();
 
     return (
-        <>
+        <div className={styles.addLayout}>
+            <div className={styles.addFilters}>
             <div className={styles.subHeader}>
                 <button className={styles.backButton} onClick={onBack}>
                     <Glyph className={styles.glyph} src="Media/Glyphs/ArrowLeft.svg" />
@@ -503,7 +559,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                     {t("addTo")}: <b>{current?.name ?? "-"}</b>
                 </span>
             </div>
-
+            <Scrollable className={styles.addFilterScroll} style={{ height: `${Math.max(120, paneMax - 64 * rem)}px` }} vertical>
             <div className={styles.fieldLabel}>{t("searchName")}</div>
             <TextField value={query ?? search.text} onChange={onQuery} />
 
@@ -579,7 +635,10 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
             <div className={styles.fieldLabel}>{t("lotSize")}</div>
             <SizeFilter label={t("lotWidth")} value={search.width} op={search.widthOp} anyLabel={t("anySize")} onValue={actions.setSearchWidth} onOp={actions.setSearchWidthOp} />
             <SizeFilter label={t("lotDepth")} value={search.depth} op={search.depthOp} anyLabel={t("anySize")} onValue={actions.setSearchDepth} onOp={actions.setSearchDepthOp} />
+            </Scrollable>
+            </div>
 
+            <div className={styles.addResults}>
             <div className={styles.resultHeader}>
                 <span>
                     <b>{search.total}</b> {t("results")}
@@ -594,9 +653,9 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
             </div>
 
             {search.results.length === 0 ? (
-                <div className={styles.empty}>{t("noResults")}</div>
+                <div className={styles.empty} style={{ height: `${Math.max(120, paneMax - 168 * rem)}px` }}>{t("noResults")}</div>
             ) : view === "grid" ? (
-                <Scrollable className={styles.gridList} vertical>
+                <Scrollable className={styles.gridList} style={{ height: `${Math.max(120, paneMax - 168 * rem)}px`, maxHeight: "none" }} vertical>
                     <div className={styles.grid}>
                         {search.results.map((r) => (
                             <div
@@ -623,7 +682,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                     </div>
                 </Scrollable>
             ) : (
-                <Scrollable className={styles.itemList} vertical>
+                <Scrollable className={styles.itemList} style={{ height: `${Math.max(120, paneMax - 168 * rem)}px`, maxHeight: "none" }} vertical>
                     {search.results.map((r) => (
                         <div key={r.name} className={styles.itemRow} onMouseEnter={() => setHover(r)} onMouseLeave={() => setHover(null)}>
                             <Star on={r.fav} className={styles.rowStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
@@ -647,15 +706,16 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                 </Scrollable>
             )}
             <PreviewBox item={hover} t={t} />
-        </>
+            </div>
+        </div>
     );
 }
 
 // ---------------------------------------------------------------- placement tab
 
-function Group({ title, extra, children }: { title: string; extra?: React.ReactNode; children: React.ReactNode }) {
+function Group({ title, extra, wide, children }: { title: string; extra?: React.ReactNode; wide?: boolean; children: React.ReactNode }) {
     return (
-        <div className={styles.group}>
+        <div className={`${styles.group} ${wide ? styles.groupWide : ""}`}>
             <div className={styles.groupHeader}>
                 <span>{title}</span>
                 {extra}
@@ -684,7 +744,7 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
     const isCustom = state.density === DENSITY.custom;
     const describe = ["densityNormal", "densityRelaxed", "densityDense", "densityCustom"][state.density] ?? "densityNormal";
     return (
-        <>
+        <div className={styles.groupGrid}>
             <Group
                 title={t("density")}
                 extra={
@@ -772,7 +832,21 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
                 <Switch value={state.fillInterior} onChange={actions.setFillInterior} label={t("fillInterior")} hint={t("fillInteriorHint")} />
             </Group>
 
-            <Group title={t("treeFill")}>
+            <Group title={t("snap")}>
+                {MouseToolOptions ? (
+                    <div className={styles.toolOptions}>
+                        <MouseToolOptions />
+                    </div>
+                ) : (
+                    <>
+                        <Switch value={(state.snapOff & SNAP_CURB) === 0} onChange={() => actions.toggleSnap(SNAP_CURB)} label={t("snapCurb")} />
+                        <Switch value={(state.snapOff & SNAP_ANGLE) === 0} onChange={() => actions.toggleSnap(SNAP_ANGLE)} label={t("snapAngle")} />
+                        <Switch value={(state.snapOff & SNAP_CELL) === 0} onChange={() => actions.toggleSnap(SNAP_CELL)} label={t("snapCell")} />
+                    </>
+                )}
+            </Group>
+
+            <Group title={t("treeFill")} wide>
                 <Switch value={state.treeFill} onChange={actions.setTreeFill} label={t("treeFill")} hint={t("treeFillHint")} />
                 {state.treeFill && (
                     <div className={styles.indent}>
@@ -811,21 +885,7 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
                     </div>
                 )}
             </Group>
-
-            <Group title={t("snap")}>
-                {MouseToolOptions ? (
-                    <div className={styles.toolOptions}>
-                        <MouseToolOptions />
-                    </div>
-                ) : (
-                    <>
-                        <Switch value={(state.snapOff & SNAP_CURB) === 0} onChange={() => actions.toggleSnap(SNAP_CURB)} label={t("snapCurb")} />
-                        <Switch value={(state.snapOff & SNAP_ANGLE) === 0} onChange={() => actions.toggleSnap(SNAP_ANGLE)} label={t("snapAngle")} />
-                        <Switch value={(state.snapOff & SNAP_CELL) === 0} onChange={() => actions.toggleSnap(SNAP_CELL)} label={t("snapCell")} />
-                    </>
-                )}
-            </Group>
-        </>
+        </div>
     );
 }
 
@@ -838,30 +898,31 @@ export const BuilderPanel = () => {
     const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, { width: PANEL_WIDTH, height: 600 });
     const [tab, setTabState] = useState<Tab>(() => (loadJson(TAB_KEY, { tab: "buildings" }).tab === "settings" ? "settings" : "buildings"));
     const [adding, setAdding] = useState(false);
-    const [confirmUndo, setConfirmUndo] = useState(false);
-    const wide = adding && tab === "buildings";
-    const width = wide ? ADD_PANEL_WIDTH : PANEL_WIDTH;
+    const addingNow = adding && tab === "buildings";
 
-    // Fit the window on screen: measure where it actually is and give the scrolling body whatever
-    // height is left down to the bottom of the screen (units of the computed layout, so no rem/px guess).
-    // When the wider add view would run off the right edge, the window is drawn further left.
+    // Fit the window on screen. Everything is measured from the laid-out window, so there is no
+    // rem/px guess: rem = pixels per rem (the window is PANEL_WIDTH rem wide), the content area is
+    // what is left below the title bar down to the screen bottom, and never more than PANE_MAX_REM,
+    // so the window stays short even if the screen size is misreported. A window dragged near the
+    // right edge is drawn further left.
     const windowRef = useRef<HTMLDivElement>(null);
-    const bodyRef = useRef<HTMLDivElement>(null);
-    const [bodyMax, setBodyMax] = useState(480);
+    const titleRef = useRef<HTMLDivElement>(null);
+    const [metrics, setMetrics] = useState({ pane: 500, rem: 1 });
     const [shiftLeft, setShiftLeft] = useState(0);
     useEffect(() => {
         const w = windowRef.current;
-        const b = bodyRef.current;
-        if (!w || !b) {
+        const title = titleRef.current;
+        if (!w || !title) {
             return;
         }
         const screen = window.innerHeight || document.documentElement.clientHeight || 1080;
         const screenW = window.innerWidth || document.documentElement.clientWidth || 1920;
         const wr = w.getBoundingClientRect();
-        const chrome = wr.height - b.getBoundingClientRect().height;
-        const available = Math.max(160, Math.floor(screen - wr.top - chrome - 12));
-        if (Math.abs(available - bodyMax) > 2) {
-            setBodyMax(available);
+        const rem = wr.width > 0 ? wr.width / PANEL_WIDTH : 1;
+        const available = Math.floor(screen - wr.top - title.getBoundingClientRect().height - 14);
+        const pane = Math.max(160 * rem, Math.min(available, PANE_MAX_REM * rem));
+        if (Math.abs(pane - metrics.pane) > 2 || Math.abs(rem - metrics.rem) > 0.01) {
+            setMetrics({ pane, rem });
         }
         const shift = Math.min(pos.x, Math.max(0, Math.ceil(pos.x + wr.width - screenW + 8)));
         if (Math.abs(shift - shiftLeft) > 2) {
@@ -878,10 +939,14 @@ export const BuilderPanel = () => {
         setTabState(next);
         saveJson(TAB_KEY, { tab: next });
     };
+    const { pane, rem } = metrics;
+    const bodyMax = Math.max(120, pane - TABS_REM * rem);
+    // The list grid gets what the buttons above it leave.
+    const gridMax = Math.max(140, bodyMax - 170 * rem);
 
     return (
-        <div ref={windowRef} className={styles.window} style={{ left: `${pos.x - shiftLeft}px`, top: `${pos.y}px`, width: `${width}rem` }}>
-            <div className={styles.titleBar} onMouseDown={onHandleDown}>
+        <div ref={windowRef} className={styles.window} style={{ left: `${pos.x - shiftLeft}px`, top: `${pos.y}px`, width: `${PANEL_WIDTH}rem` }}>
+            <div ref={titleRef} className={styles.titleBar} onMouseDown={onHandleDown}>
                 <span className={styles.title}>Block Builder</span>
                 <button className={styles.iconButton} title={t("resetPos")} onMouseDown={(e) => e.stopPropagation()} onClick={reset}>
                     <Glyph className={styles.glyph} src="Media/Glyphs/ArrowCircular.svg" />
@@ -891,79 +956,37 @@ export const BuilderPanel = () => {
                 </button>
             </div>
 
-            <div className={styles.tabs}>
-                <button className={`${styles.tab} ${tab === "buildings" ? styles.tabOn : ""}`} onClick={() => setTab("buildings")}>
-                    {t("tabBuildings")}
-                </button>
-                <button className={`${styles.tab} ${tab === "settings" ? styles.tabOn : ""}`} onClick={() => setTab("settings")}>
-                    {t("tabSettings")}
-                </button>
-            </div>
+            {addingNow ? (
+                <AddBuildings search={search} lists={lists} state={state} t={t} onBack={() => setAdding(false)} paneMax={pane} rem={rem} />
+            ) : (
+                <div className={styles.columns}>
+                    <Scrollable className={styles.side} style={{ height: `${pane}px` }} vertical>
+                        <StatusCard state={state} t={t} />
+                        <Actions state={state} t={t} />
+                    </Scrollable>
 
-            <div ref={bodyRef} className={styles.bodyWrap}>
-                <Scrollable className={styles.body} style={{ maxHeight: `${bodyMax}px` }} vertical>
-                    <StatusCard state={state} t={t} />
-                    {tab === "buildings" &&
-                        (adding ? (
-                            <AddBuildings search={search} lists={lists} state={state} t={t} onBack={() => setAdding(false)} />
-                        ) : (
-                            <>
-                                <ListPicker state={state} lists={lists} t={t} />
-                                <ListContents state={state} lists={lists} t={t} onAdd={() => setAdding(true)} />
-                            </>
-                        ))}
-                    {tab === "settings" && <PlacementSettings state={state} lists={lists} t={t} />}
-                </Scrollable>
-            </div>
+                    <div className={styles.main}>
+                        <div className={styles.tabs}>
+                            <button className={`${styles.tab} ${tab === "buildings" ? styles.tabOn : ""}`} onClick={() => setTab("buildings")}>
+                                {t("tabBuildings")}
+                            </button>
+                            <button className={`${styles.tab} ${tab === "settings" ? styles.tabOn : ""}`} onClick={() => setTab("settings")}>
+                                {t("tabSettings")}
+                            </button>
+                        </div>
 
-            {confirmUndo && (
-                <div className={`${styles.prompt} ${styles.footerPrompt}`}>
-                    <div className={styles.promptLabel}>{t("confirmUndo")}</div>
-                    <div className={styles.promptRow}>
-                        <button
-                            className={`${styles.chip} ${styles.chipDanger}`}
-                            onClick={() => {
-                                actions.undoBuild();
-                                setConfirmUndo(false);
-                            }}
-                        >
-                            {t("undoBuild")}
-                        </button>
-                        <button className={styles.chip} onClick={() => setConfirmUndo(false)}>
-                            {t("cancel")}
-                        </button>
+                        <Scrollable className={styles.body} style={{ height: `${bodyMax}px` }} vertical>
+                            {tab === "buildings" && (
+                                <>
+                                    <ListPicker state={state} lists={lists} t={t} />
+                                    <ListContents state={state} lists={lists} t={t} onAdd={() => setAdding(true)} gridMax={gridMax} />
+                                </>
+                            )}
+                            {tab === "settings" && <PlacementSettings state={state} lists={lists} t={t} />}
+                        </Scrollable>
                     </div>
                 </div>
             )}
-
-            <div className={styles.footer}>
-                <button className={`${styles.button} ${styles.primary}`} disabled={!state.planned || state.buildings + state.streets === 0} onClick={actions.build}>
-                    {t("build")}
-                </button>
-                <button className={styles.button} disabled={!state.planned} onClick={actions.optimize} title={t("optimizeHint")}>
-                    {t("optimize")}
-                </button>
-                <button className={styles.button} onClick={actions.shuffle}>
-                    {t("shuffle")}
-                </button>
-                <button className={styles.button} onClick={actions.clearArea}>
-                    {t("clear")}
-                </button>
-                <button
-                    className={styles.button}
-                    disabled={state.undoCount === 0 || state.undoing}
-                    title={t("undoHint")}
-                    onClick={() => {
-                        if (state.planned || state.buildings + state.streets > 0) {
-                            setConfirmUndo(true);
-                        } else {
-                            actions.undoBuild();
-                        }
-                    }}
-                >
-                    {t("undoBuild")}
-                </button>
-            </div>
         </div>
     );
 };

@@ -73,7 +73,7 @@ export const T: { [key: string]: [string, string] } = {
     clickToEdit: ["Click to set its weight and limit.", "누르면 비중과 최대 개수를 정할 수 있습니다."],
     weight: ["Weight (how often)", "비중 (얼마나 자주)"],
     maxCount: ["At most per build", "한 번에 최대"],
-    weightHint: ["x2 is picked about twice as often as x1. The limit counts all painted areas together.", "x2는 x1보다 약 두 배 자주 고릅니다. 최대 개수는 칠한 영역 전체를 합쳐 셉니다."],
+    weightHint: ["x2 = twice as often. The limit counts every painted area together.", "x2 = 2배 자주. 최대는 영역 전체 합계"],
     viewGrid: ["Pictures", "큰 그림"],
     viewList: ["List", "목록"],
     theme: ["Theme", "테마"],

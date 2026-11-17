@@ -91,7 +91,7 @@ $radius: 6rem;
 }
 
 .stepChip {
-    flex: 1;
+    flex: none;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -120,6 +120,7 @@ $radius: 6rem;
 }
 
 .stepCurrent {
+    flex: 1;
     color: $text;
     background-color: $accent-soft;
 
@@ -143,10 +144,10 @@ $radius: 6rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 4rem 0;
+    padding: 2rem 0;
 
     b {
-        font-size: 20rem;
+        font-size: 18rem;
         color: $text;
     }
 
@@ -1054,12 +1055,13 @@ $radius: 6rem;
 }
 
 .useTile {
-    width: 60rem;
+    width: 18.5%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 0 4rem 4rem 0;
-    padding: 6rem 2rem 4rem 2rem;
+    margin: 0 1% 4rem 0;
+    padding: 5rem 2rem 3rem 2rem;
     color: $text;
     background-color: $surface;
     border: 2rem solid transparent;
@@ -1081,9 +1083,9 @@ $radius: 6rem;
 }
 
 .useIcon {
-    width: 28rem;
-    height: 28rem;
-    margin-bottom: 4rem;
+    width: 24rem;
+    height: 24rem;
+    margin-bottom: 3rem;
 }
 
 .useLabel {
@@ -1437,4 +1439,211 @@ $radius: 6rem;
     font-size: 10rem;
     background-color: rgba(0, 0, 0, 0.6);
     border-radius: 8rem;
+}
+
+
+// ---- Landscape layout ----
+
+.columns {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+// Left column: status and the action buttons, always visible.
+.side {
+    width: 250rem;
+    flex: none;
+    padding: 10rem 10rem 8rem 12rem;
+    box-sizing: border-box;
+    border-right: 1rem solid $line;
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+// Right column: tabs and their scrolling body.
+.main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.actionButton {
+    padding: 9rem 6rem;
+    color: $text;
+    font-size: 13rem;
+    background-color: $surface-hover;
+    border: none;
+    border-radius: $radius;
+    cursor: pointer;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.18);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+}
+
+.actionWide {
+    width: 100%;
+    margin-bottom: 6rem;
+    padding: 11rem 6rem;
+    font-size: 14rem;
+    font-weight: bold;
+}
+
+.actionGrid {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.actionHalf {
+    width: 48.5%;
+    box-sizing: border-box;
+    margin-bottom: 6rem;
+}
+
+// Buildings tab: the list grid and the detail card side by side.
+.toolbarSpacer {
+    flex: 1;
+}
+
+.listPanes {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.listGrid {
+    // Basis 0: the grid's width never depends on its content, only on what the card leaves.
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+// The card keeps exactly this width whatever it shows (long names, the weight and limit rows):
+// a card that grows pushes the grid narrower, and the picture tiles are shares of the grid.
+.listDetail {
+    width: 190rem;
+    min-width: 190rem;
+    max-width: 190rem;
+    flex: 0 0 190rem;
+    box-sizing: border-box;
+    margin-left: 8rem;
+    overflow: hidden;
+
+    .previewText {
+        width: 100%;
+    }
+
+    .previewName {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    // Label on its own row, then - value +, so the row is never wider than the card.
+    .stepper {
+        flex-wrap: wrap;
+        padding: 3rem 0;
+    }
+
+    .stepperLabel {
+        flex: none;
+        width: 100%;
+        margin-bottom: 3rem;
+        font-size: 12rem;
+    }
+
+    .stepValue {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+    }
+}
+
+.detailImage {
+    width: 100%;
+    height: 84rem;
+    object-fit: contain;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 4rem;
+}
+
+.detailTop {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.listDetail .detailCard {
+    margin-top: 0;
+}
+
+.listDetail .previewBox {
+    margin-top: 0;
+    height: auto;
+    min-height: 60rem;
+}
+
+// Settings tab: two columns of groups.
+.groupGrid {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .group {
+        width: 48.5%;
+        box-sizing: border-box;
+    }
+
+    .groupWide {
+        width: 100%;
+    }
+}
+
+// Add buildings: filters on the left, results on the right, across the whole window.
+.addLayout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.addFilters {
+    width: 300rem;
+    flex: none;
+    box-sizing: border-box;
+    padding: 10rem 8rem 6rem 12rem;
+    border-right: 1rem solid $line;
+    background-color: rgba(0, 0, 0, 0.12);
+
+    .subHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 4rem;
+    }
+}
+
+.addFilterScroll {
+    width: 100%;
+    padding-right: 4rem;
+}
+
+.addResults {
+    flex: 1;
+    min-width: 0;
+    padding: 10rem 12rem 8rem 10rem;
 }
