@@ -408,6 +408,7 @@ namespace BlockBuilder
                 }
             }));
             AddBinding(new TriggerBinding(kGroup, "build", () => m_Tool.RequestApply()));
+            AddBinding(new TriggerBinding(kGroup, "undoBuild", () => m_Tool.RequestUndo()));
             // Brush size does not change the layout: save it without bumping the plan revision.
             AddBinding(new TriggerBinding<int>(kGroup, "setBrush", n =>
             {
@@ -1010,6 +1011,8 @@ namespace BlockBuilder
             sb.Append('{');
             Prop(sb, "active", m_Tool.IsActive);
             Prop(sb, "planned", m_Tool.IsPlanned);
+            Prop(sb, "undoCount", m_Tool.UndoCount);
+            Prop(sb, "undoing", m_Tool.Undoing);
             Prop(sb, "corners", m_Tool.CornerCount);
             Prop(sb, "designated", m_Tool.DesignatedCount);
             Prop(sb, "buildings", m_Tool.PlannedBuildings);

@@ -6,6 +6,9 @@ const GROUP = "blockBuilder";
 export interface BuilderState {
     active: boolean;
     planned: boolean;
+    /** Objects and streets the last build made (0 = nothing to undo). */
+    undoCount: number;
+    undoing: boolean;
     corners: number;
     designated: number;
     buildings: number;
@@ -151,6 +154,8 @@ export const listsBinding = bindValue<string>(GROUP, "lists", '{"palettes":[],"e
 const emptyState: BuilderState = {
     active: false,
     planned: false,
+    undoCount: 0,
+    undoing: false,
     corners: 0,
     designated: 0,
     buildings: 0,
@@ -233,6 +238,7 @@ export const actions = {
     setSelection: (n: number) => trigger(GROUP, "setSelection", n),
     setBrush: (n: number) => trigger(GROUP, "setBrush", n),
     build: () => trigger(GROUP, "build"),
+    undoBuild: () => trigger(GROUP, "undoBuild"),
     setDensity: (n: number) => trigger(GROUP, "setDensity", n),
     newList: (name: string) => trigger(GROUP, "newList", name),
     newListFromChecked: (name: string) => trigger(GROUP, "newListFromChecked", name),

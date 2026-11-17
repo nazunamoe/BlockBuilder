@@ -165,6 +165,8 @@ namespace BlockBuilder
 
             m_PlanKey = string.Empty;
             m_Submitted = 0;
+            m_Submissions.Clear();
+            m_Undo = UndoPhase.None; // an undo cut short by the menu is simply not done
             m_AllDefinitions.CompleteDependency();
             EntityManager.DestroyEntity(m_AllDefinitions);
             Mod.log.Info("builder: stopped (area kept)");
@@ -175,6 +177,7 @@ namespace BlockBuilder
         {
             base.OnGamePreload(purpose, mode);
             ResetAll();
+            m_LastBuild.Clear(); // positions of another city's build mean nothing here
         }
 
         private void ResetAll()
@@ -205,6 +208,7 @@ namespace BlockBuilder
         private JobHandle ClearPreview(JobHandle deps)
         {
             m_Submitted = 0;
+            m_Submissions.Clear();
             m_PlanKey = string.Empty;
             applyMode = ApplyMode.Clear;
             return DestroyDefinitions(m_DefinitionQuery, m_ToolOutputBarrier, deps);
@@ -231,6 +235,12 @@ namespace BlockBuilder
                 inputDeps = ClearPreview(inputDeps);
                 ResetAll();
                 Note("area cleared", "영역을 지웠습니다");
+                return inputDeps;
+            }
+
+            if (UpdateUndo(ref inputDeps))
+            {
+                DrawOverlay();
                 return inputDeps;
             }
 
@@ -986,6 +996,11 @@ namespace BlockBuilder
 
             m_PendingClick = false;
             bool allow = GetAllowApply();
+            if (m_Undo == UndoPhase.Settling)
+            {
+                return FinishUndo(allow, deps);
+            }
+
             if (!allow)
             {
                 LogErrors(temps);
@@ -996,6 +1011,7 @@ namespace BlockBuilder
             m_Status = Mod.IsKorean
                 ? $"건물 {m_Plan?.Placements.Count}채, 도로 {m_Plan?.Roads.Count}개를 지었습니다"
                 : $"built {m_Plan?.Placements.Count} buildings and {m_Plan?.Roads.Count} streets";
+            RememberBuild();
             for (int i = 0; i < m_Seeds.Count; i++)
             {
                 m_Seeds[i] = RandomSeed.Next();
@@ -1163,6 +1179,7 @@ namespace BlockBuilder
         private JobHandle PlanAndSubmit(Setting options, JobHandle deps)
         {
             m_Submitted = 0;
+            m_Submissions.Clear();
             var palette = PaletteStore.Get(options.ActivePalette);
             if (palette == null || palette.Entries.Count == 0)
             {
@@ -1604,6 +1621,7 @@ namespace BlockBuilder
                 0f, 0f, 0f, 0f, UnityEngine.Time.deltaTime, Seed(index),
                 Snap.None, age, false, default(PlacementOverrides), deps);
             points.Dispose(handle);
+            NoteSubmittedObject(prefab, position);
             m_Submitted++;
             return handle;
         }
@@ -1638,6 +1656,7 @@ namespace BlockBuilder
             buffer.AddComponent(e, new CreationDefinition { m_Prefab = prefab, m_RandomSeed = Seed(10000 + m_Submitted).GetRandom(0).NextInt() });
             buffer.AddComponent(e, course);
             buffer.AddComponent(e, default(Updated));
+            NoteSubmittedRoad(prefab, a, b);
             m_Submitted++;
         }
 

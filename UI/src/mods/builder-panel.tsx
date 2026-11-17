@@ -826,6 +826,7 @@ export const BuilderPanel = () => {
     const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, { width: PANEL_WIDTH, height: 600 });
     const [tab, setTabState] = useState<Tab>(() => (loadJson(TAB_KEY, { tab: "buildings" }).tab === "settings" ? "settings" : "buildings"));
     const [adding, setAdding] = useState(false);
+    const [confirmUndo, setConfirmUndo] = useState(false);
     const wide = adding && tab === "buildings";
     const width = wide ? ADD_PANEL_WIDTH : PANEL_WIDTH;
 
@@ -903,6 +904,26 @@ export const BuilderPanel = () => {
                 </Scrollable>
             </div>
 
+            {confirmUndo && (
+                <div className={`${styles.prompt} ${styles.footerPrompt}`}>
+                    <div className={styles.promptLabel}>{t("confirmUndo")}</div>
+                    <div className={styles.promptRow}>
+                        <button
+                            className={`${styles.chip} ${styles.chipDanger}`}
+                            onClick={() => {
+                                actions.undoBuild();
+                                setConfirmUndo(false);
+                            }}
+                        >
+                            {t("undoBuild")}
+                        </button>
+                        <button className={styles.chip} onClick={() => setConfirmUndo(false)}>
+                            {t("cancel")}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className={styles.footer}>
                 <button className={`${styles.button} ${styles.primary}`} disabled={!state.planned || state.buildings + state.streets === 0} onClick={actions.build}>
                     {t("build")}
@@ -915,6 +936,20 @@ export const BuilderPanel = () => {
                 </button>
                 <button className={styles.button} onClick={actions.clearArea}>
                     {t("clear")}
+                </button>
+                <button
+                    className={styles.button}
+                    disabled={state.undoCount === 0 || state.undoing}
+                    title={t("undoHint")}
+                    onClick={() => {
+                        if (state.planned || state.buildings + state.streets > 0) {
+                            setConfirmUndo(true);
+                        } else {
+                            actions.undoBuild();
+                        }
+                    }}
+                >
+                    {t("undoBuild")}
                 </button>
             </div>
         </div>
