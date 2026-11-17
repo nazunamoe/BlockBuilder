@@ -41,6 +41,8 @@ namespace BlockBuilder.Core
     public sealed class CatalogItem
     {
         public string Name = string.Empty;
+        /// <summary>Name the game shows (localized); text search matches it as well as the prefab name.</summary>
+        public string DisplayName = string.Empty;
         public ItemKind Kind;
         /// <summary>Lot width in 8 m cells.</summary>
         public int LotWidth;
@@ -264,7 +266,8 @@ namespace BlockBuilder.Core
             if (!string.IsNullOrWhiteSpace(Text))
             {
                 string text = Text.Trim();
-                if (item.Name.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0 && item.Zone.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0)
+                if (item.Name.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0 && item.Zone.IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0
+                    && (item.DisplayName ?? string.Empty).IndexOf(text, StringComparison.OrdinalIgnoreCase) < 0)
                 {
                     return false;
                 }

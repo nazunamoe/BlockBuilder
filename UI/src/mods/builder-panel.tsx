@@ -25,6 +25,9 @@ const VIEW_KEY = "blockBuilder.addView";
 const DEFAULT_POS = { x: 12, y: 120 };
 
 type Tr = (k: string) => string;
+
+/** What the hover preview shows: the game's name, the prefab id, size and picture. */
+type Shown = { name: string; label: string; size: string; thumb: string };
 type Prompt = "" | "new" | "fromChecked" | "rename" | "delete";
 type Tab = "buildings" | "settings";
 
@@ -192,14 +195,15 @@ function Thumb({ src, className }: { src: string; className: string }) {
 }
 
 /** Larger picture of the hovered row (fixed height, so the list does not jump). */
-function PreviewBox({ item, t }: { item: { name: string; size: string; thumb: string } | null; t: Tr }) {
+function PreviewBox({ item, t }: { item: Shown | null; t: Tr }) {
     return (
         <div className={styles.previewBox}>
             {item ? (
                 <>
                     <Thumb src={item.thumb} className={styles.previewImage} />
                     <div className={styles.previewText}>
-                        <span className={styles.previewName}>{item.name}</span>
+                        <span className={styles.previewName}>{item.label || item.name}</span>
+                        {item.label && item.label !== item.name && <span className={styles.previewPrefab}>{item.name}</span>}
                         <span className={styles.badge}>{item.size}</span>
                     </div>
                 </>
@@ -281,7 +285,7 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                                 {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
                                 <div className={styles.itemName}>
                                     <Thumb src={e.thumb} className={styles.thumb} />
-                                    <span className={styles.name}>{e.name}</span>
+                                    <span className={styles.name}>{e.label || e.name}</span>
                                     <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
                                 </div>
                                 <button className={styles.removeButton} title={t("removeFromList")} onClick={() => actions.removeItem(i)}>
@@ -312,7 +316,7 @@ function UseTile({ label, icon, count, on, onClick }: { label: string; icon: str
 function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void }) {
     // Start from the text the C# side still filters by (it survives a UI reload).
     const [query, setQuery] = useState<string | null>(null);
-    const [hover, setHover] = useState<{ name: string; size: string; thumb: string } | null>(null);
+    const [hover, setHover] = useState<Shown | null>(null);
     const onQuery = (s: string) => {
         setQuery(s);
         actions.setSearchText(s);
@@ -428,7 +432,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                                         </span>
                                     )}
                                 </div>
-                                <span className={styles.tileName}>{r.name}</span>
+                                <span className={styles.tileName}>{r.label || r.name}</span>
                             </button>
                         ))}
                     </div>
@@ -439,7 +443,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                         <div key={r.name} className={styles.itemRow} onMouseEnter={() => setHover(r)} onMouseLeave={() => setHover(null)}>
                             <div className={styles.itemName}>
                                 <Thumb src={r.thumb} className={styles.thumb} />
-                                <span className={styles.name}>{r.name}</span>
+                                <span className={styles.name}>{r.label || r.name}</span>
                                 <span className={styles.badge}>{r.size}</span>
                             </div>
                             {r.inList ? (
@@ -611,7 +615,7 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
                                         <Check checked={tree.checked} onClick={() => actions.toggleTree(tree.name)} />
                                         <div className={styles.itemName}>
                                             <Thumb src={tree.thumb} className={styles.thumb} />
-                                            <span className={styles.name}>{tree.name}</span>
+                                            <span className={styles.name}>{tree.label || tree.name}</span>
                                         </div>
                                     </div>
                                 ))}

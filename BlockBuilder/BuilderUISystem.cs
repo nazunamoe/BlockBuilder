@@ -792,6 +792,7 @@ namespace BlockBuilder
                 first = false;
                 sb.Append('{');
                 Prop(sb, "name", b.Name);
+                Prop(sb, "label", PrefabNames.Of(b.Name));
                 Prop(sb, "size", $"{b.LotWidth}x{b.LotDepth}");
                 Prop(sb, "thumb", Thumb(b));
                 Prop(sb, "inList", inList.Contains(b.Name), last: true);
@@ -892,10 +893,13 @@ namespace BlockBuilder
                 m_Tool.Toggle();
             }
 
+            // Shown names follow the game language (also what the name search matches).
+            m_Catalog.EnsureNames();
+
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
+                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;
@@ -909,7 +913,7 @@ namespace BlockBuilder
                 m_TreeSetStamp = TreeSetStamp() + "|" + string.Join(",", ReadTreeSets().Select(x => x.Id + x.Names.Count));
             }
 
-            string listsKey = $"{m_TreeSetStamp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{options.CheckedItems}|{options.TreeNames}|{m_Catalog.Trees.Count}";
+            string listsKey = $"{m_TreeSetStamp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{options.CheckedItems}|{options.TreeNames}|{m_Catalog.Trees.Count}|{m_Catalog.NamesLocale}";
             if (listsKey != m_ListsKey)
             {
                 m_ListsKey = listsKey;
@@ -1009,6 +1013,7 @@ namespace BlockBuilder
                     var building = m_Catalog.Ready ? m_Catalog.FindBuilding(entry.Prefab) : null;
                     sb.Append('{');
                     Prop(sb, "name", entry.Prefab);
+                    Prop(sb, "label", PrefabNames.Of(entry.Prefab));
                     Prop(sb, "size", building != null ? $"{building.LotWidth}x{building.LotDepth}" : "?");
                     Prop(sb, "thumb", Thumb(building));
                     Prop(sb, "loaded", building != null || !m_Catalog.Ready);
@@ -1029,6 +1034,7 @@ namespace BlockBuilder
                 var tree = m_Catalog.Trees[i];
                 sb.Append('{');
                 Prop(sb, "name", tree.Name);
+                Prop(sb, "label", PrefabNames.Of(tree.Name));
                 Prop(sb, "thumb", Thumb(tree.Name, tree.Prefab));
                 Prop(sb, "checked", treeNames.Contains(tree.Name), last: true);
                 sb.Append('}');

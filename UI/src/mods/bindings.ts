@@ -50,6 +50,8 @@ export interface PaletteInfo {
 
 export interface EntryInfo {
     name: string;
+    /** Name the game shows (localized); name stays the prefab id. */
+    label: string;
     size: string;
     thumb: string;
     loaded: boolean;
@@ -66,6 +68,7 @@ export interface Lists {
 
 export interface TreeInfo {
     name: string;
+    label: string;
     thumb: string;
     checked: boolean;
 }
@@ -77,6 +80,7 @@ export const SNAP_ANGLE = 4; // StraightDirection
 
 export interface SearchResult {
     name: string;
+    label: string;
     size: string;
     thumb: string;
     inList: boolean;

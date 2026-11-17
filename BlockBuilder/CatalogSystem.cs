@@ -150,6 +150,7 @@ namespace BlockBuilder
         {
             Buildings.Clear();
             m_ByName = null;
+            m_NamesLocale = null;
             var prefabs = World.GetOrCreateSystemManaged<PrefabSystem>();
             using var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<BuildingData>(), ComponentType.ReadOnly<ObjectGeometryData>());
             using var entities = query.ToEntityArray(Allocator.Temp);
@@ -300,6 +301,29 @@ namespace BlockBuilder
         }
 
         private Dictionary<string, BuildingEntry> m_ByName;
+        private string m_NamesLocale;
+
+        /// <summary>
+        /// Gives every building its shown name in the active language (searched by name too).
+        /// Cheap when nothing changed; call before searching or listing.
+        /// </summary>
+        public void EnsureNames()
+        {
+            string locale = PrefabNames.Locale;
+            if (!Ready || locale == m_NamesLocale)
+            {
+                return;
+            }
+
+            m_NamesLocale = locale;
+            foreach (var b in Buildings)
+            {
+                b.Item.DisplayName = PrefabNames.Of(b.Name);
+            }
+        }
+
+        /// <summary>Language the names were last made for (part of the panel's refresh keys).</summary>
+        public string NamesLocale => m_NamesLocale ?? string.Empty;
 
         public BuildingEntry FindBuilding(string name)
         {
