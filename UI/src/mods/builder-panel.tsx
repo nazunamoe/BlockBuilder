@@ -451,6 +451,22 @@ function EntryDetail({ entry, index, editable, t }: { entry: EntryInfo | null; i
     );
 }
 
+/** Star toggle for favourites; does not reach the tile's own click. */
+function Star({ on, className, onToggle, t }: { on: boolean; className: string; onToggle: () => void; t: Tr }) {
+    return (
+        <button
+            className={`${styles.star} ${on ? styles.starOn : ""} ${className}`}
+            title={on ? t("unstar") : t("star")}
+            onClick={(ev) => {
+                ev.stopPropagation();
+                onToggle();
+            }}
+        >
+            <Glyph className={styles.starGlyph} src={on ? "Media/Glyphs/StarFilled.svg" : "Media/Glyphs/StarOutline.svg"} />
+        </button>
+    );
+}
+
 /** One use button: the game's zoning icon, the name and how many buildings it gives. */
 function UseTile({ label, icon, count, on, onClick }: { label: string; icon: string; count: number; on: boolean; onClick: () => void }) {
     return (
@@ -491,9 +507,26 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
             <div className={styles.fieldLabel}>{t("searchName")}</div>
             <TextField value={query ?? search.text} onChange={onQuery} />
 
+            <div className={styles.shortcutRow}>
+                {[
+                    { id: "favorites", label: t("favorites"), glyph: "Media/Glyphs/StarFilled.svg", count: search.favoriteCount },
+                    { id: "recent", label: t("recent"), glyph: "Media/Glyphs/ArrowCircular.svg", count: search.recentCount },
+                ].map((s) => (
+                    <button
+                        key={s.id}
+                        className={`${styles.subChip} ${search.group === s.id ? styles.subChipOn : ""}`}
+                        onClick={() => actions.setSearchGroup(search.group === s.id ? "" : s.id)}
+                    >
+                        <Glyph className={styles.shortcutGlyph} src={s.glyph} />
+                        {s.label}
+                        <span className={styles.subCount}>{s.count}</span>
+                    </button>
+                ))}
+            </div>
+
             <div className={styles.fieldLabel}>{t("use")}</div>
             <div className={styles.useRow}>
-                <UseTile label={t("anyCategory")} icon="Media/Game/Icons/Zones.svg" count={search.anyCount} on={openGroup === undefined} onClick={() => actions.setSearchGroup("")} />
+                <UseTile label={t("anyCategory")} icon="Media/Game/Icons/Zones.svg" count={search.anyCount} on={search.group === ""} onClick={() => actions.setSearchGroup("")} />
                 {search.groups.map((g) => (
                     <UseTile key={g.id} label={g.label} icon={g.icon} count={g.count} on={openGroup?.id === g.id} onClick={() => actions.setSearchGroup(g.id)} />
                 ))}
@@ -556,17 +589,17 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                 <Scrollable className={styles.gridList} vertical>
                     <div className={styles.grid}>
                         {search.results.map((r) => (
-                            <button
+                            <div
                                 key={r.name}
-                                className={`${styles.tile} ${r.inList ? styles.tileOn : ""}`}
-                                disabled={!current}
+                                className={`${styles.tile} ${r.inList ? styles.tileOn : ""} ${current ? "" : styles.dim}`}
                                 onMouseEnter={() => setHover(r)}
                                 onMouseLeave={() => setHover(null)}
-                                onClick={() => (r.inList ? actions.removeItemByName(r.name) : actions.addItem(r.name))}
+                                onClick={() => current && (r.inList ? actions.removeItemByName(r.name) : actions.addItem(r.name))}
                             >
                                 <div className={styles.tileImageWrap}>
                                     <Thumb src={r.thumb} className={styles.tileImage} />
                                     <span className={styles.tileSize}>{r.size}</span>
+                                    <Star on={r.fav} className={styles.tileStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
                                     {r.inList && (
                                         <span className={styles.tileCheck}>
                                             <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />
@@ -574,7 +607,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                                     )}
                                 </div>
                                 <span className={styles.tileName}>{r.label || r.name}</span>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 </Scrollable>
@@ -582,6 +615,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                 <Scrollable className={styles.itemList} vertical>
                     {search.results.map((r) => (
                         <div key={r.name} className={styles.itemRow} onMouseEnter={() => setHover(r)} onMouseLeave={() => setHover(null)}>
+                            <Star on={r.fav} className={styles.rowStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
                             <div className={styles.itemName}>
                                 <Thumb src={r.thumb} className={styles.thumb} />
                                 <span className={styles.name}>{r.label || r.name}</span>

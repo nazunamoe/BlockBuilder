@@ -1362,3 +1362,59 @@ $radius: 6rem;
     align-items: center;
     margin-bottom: 4rem;
 }
+
+// ---- Favourites and recently added ----
+
+.shortcutRow {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 6rem;
+}
+
+.shortcutGlyph {
+    width: 12rem;
+    height: 12rem;
+    margin-right: 5rem;
+    background-color: $warn;
+}
+
+.star {
+    width: 20rem;
+    height: 20rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    border: none;
+    border-radius: 10rem;
+    cursor: pointer;
+
+    &:hover {
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+}
+
+.starGlyph {
+    width: 13rem;
+    height: 13rem;
+    background-color: rgba(255, 255, 255, 0.75);
+}
+
+.starOn .starGlyph {
+    background-color: $warn;
+}
+
+.tileStar {
+    position: absolute;
+    top: 3rem;
+    left: 3rem;
+}
+
+.rowStar {
+    flex-shrink: 0;
+    margin-right: 2rem;
+    background-color: transparent;
+}

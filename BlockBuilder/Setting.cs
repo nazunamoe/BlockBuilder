@@ -160,6 +160,48 @@ namespace BlockBuilder
             CheckedItems = string.Join("\n", sorted);
         }
 
+        /// <summary>Starred prefab names, one per line (the ★ group in the add view).</summary>
+        [SettingsUIHidden]
+        public string FavoriteItems { get; set; }
+
+        /// <summary>Prefabs added to any list, newest first, one per line (the "recent" group).</summary>
+        [SettingsUIHidden]
+        public string RecentItems { get; set; }
+
+        internal const int kRecentItemsKept = 40;
+
+        internal static List<string> Lines(string text) => new List<string>((text ?? string.Empty).Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries));
+
+        internal void ToggleFavorite(string name)
+        {
+            var set = new HashSet<string>(Lines(FavoriteItems));
+            if (!set.Remove(name))
+            {
+                set.Add(name);
+            }
+
+            var sorted = new List<string>(set);
+            sorted.Sort(System.StringComparer.Ordinal);
+            FavoriteItems = string.Join("\n", sorted);
+        }
+
+        internal void NoteAdded(IEnumerable<string> names)
+        {
+            var recent = Lines(RecentItems);
+            foreach (var n in names)
+            {
+                recent.Remove(n);
+                recent.Insert(0, n);
+            }
+
+            if (recent.Count > kRecentItemsKept)
+            {
+                recent.RemoveRange(kRecentItemsKept, recent.Count - kRecentItemsKept);
+            }
+
+            RecentItems = string.Join("\n", recent);
+        }
+
         internal Core.FillMode PlacementMode => PlacedOnly ? Core.FillMode.FixedOnly : Core.FillMode.Fill;
 
         /// <summary>Snap options (Game.Tools.Snap bits) turned off in the game's tool options panel. Default 0 = all on.</summary>
@@ -409,6 +451,8 @@ namespace BlockBuilder
             Scope = ItemScope.All;
             PlacedOnly = false;
             CheckedItems = string.Empty;
+            FavoriteItems = string.Empty;
+            RecentItems = string.Empty;
             GenerateRoads = false;
             NewRoadName = "Small Road";
             MaxBlockLength = 160;

@@ -457,7 +457,16 @@ namespace BlockBuilder
                     RemoveItem(index);
                 }
             }));
-            AddBinding(new TriggerBinding<string>(kGroup, "addItem", name => AddItems(new[] { name })));
+            AddBinding(new TriggerBinding<string>(kGroup, "addItem", name => AddItems(new[] { name }, rememberAsRecent: true)));
+            // Stars only change the add view: saved quietly, the plan stays (and moved lots stay put).
+            AddBinding(new TriggerBinding<string>(kGroup, "toggleFavorite", name =>
+            {
+                if (Mod.Options != null && !string.IsNullOrEmpty(name))
+                {
+                    Mod.Options.ToggleFavorite(name);
+                    Mod.Options.ApplyAndSave();
+                }
+            }));
             AddBinding(new TriggerBinding(kGroup, "addResults", () =>
             {
                 // Guard against adding the whole catalog with one click.
@@ -471,7 +480,7 @@ namespace BlockBuilder
             // ---- Catalog search (not persisted) ----
             AddBinding(m_Search = new ValueBinding<string>(kGroup, "search", "{\"total\":0,\"results\":[],\"groups\":[],\"themes\":[]}"));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchText", s => { m_SearchText = s ?? string.Empty; m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<string>(kGroup, "setSearchGroup", g => { m_SearchGroup = kGroups.Any(x => x.Id == g) ? g : string.Empty; m_SearchCategory = -1; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<string>(kGroup, "setSearchGroup", g => { m_SearchGroup = kGroups.Any(x => x.Id == g) || g == kFavorites || g == kRecent ? g : string.Empty; m_SearchCategory = -1; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c =>
             {
                 // A sub-category of the open group, or -1 for the whole group.
@@ -521,6 +530,10 @@ namespace BlockBuilder
         private static UseSub Sub(Core.ItemCategory c, string en, string ko, string icon) => new UseSub { Category = c, En = en, Ko = ko, Icon = icon };
 
         private const string kIcons = "Media/Game/Icons/";
+
+        /// <summary>Not uses but personal shortcuts: starred buildings and the ones added lately.</summary>
+        private const string kFavorites = "favorites";
+        private const string kRecent = "recent";
 
         /// <summary>Use groups as the game's zoning menu shows them, with its own icons.</summary>
         private static readonly UseGroup[] kGroups =
@@ -705,7 +718,7 @@ namespace BlockBuilder
             Edit(o => { });
         }
 
-        private static void AddItems(IEnumerable<string> names)
+        private static void AddItems(IEnumerable<string> names, bool rememberAsRecent = false)
         {
             var options = Mod.Options;
             var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
@@ -715,7 +728,8 @@ namespace BlockBuilder
             }
 
             int before = palette.Entries.Count;
-            foreach (var n in names.Where(n => !string.IsNullOrEmpty(n)).ToList())
+            var list = names.Where(n => !string.IsNullOrEmpty(n)).ToList();
+            foreach (var n in list)
             {
                 if (!palette.Entries.Any(e => e.Prefab == n))
                 {
@@ -726,11 +740,22 @@ namespace BlockBuilder
             if (palette.Entries.Count != before)
             {
                 PaletteStore.Update(options.ActivePalette);
-                Edit(o => { });
+                // One by one is a choice worth remembering; "add all" would flush the recent group.
+                Edit(o =>
+                {
+                    if (rememberAsRecent)
+                    {
+                        o.NoteAdded(list);
+                    }
+                });
             }
         }
 
         private List<BuildingEntry> Search() => Search(out _);
+
+        // Set by the last Search: matches that are starred / recently added.
+        private int m_FavoriteCount;
+        private int m_RecentCount;
 
         /// <summary>
         /// Buildings matching every filter; <paramref name="counts"/> gets the matches per category
@@ -750,6 +775,27 @@ namespace BlockBuilder
                 var c = b.Item.Category;
                 counts.TryGetValue(c, out int n);
                 counts[c] = n + 1;
+            }
+
+            var options = Mod.Options;
+            var favorites = new HashSet<string>(Setting.Lines(options?.FavoriteItems));
+            var recent = Setting.Lines(options?.RecentItems);
+            m_FavoriteCount = matches.Count(b => favorites.Contains(b.Name));
+            var recentRank = new Dictionary<string, int>();
+            for (int i = 0; i < recent.Count; i++)
+            {
+                recentRank[recent[i]] = i;
+            }
+
+            m_RecentCount = matches.Count(b => recentRank.ContainsKey(b.Name));
+            if (m_SearchGroup == kFavorites)
+            {
+                return matches.Where(b => favorites.Contains(b.Name)).ToList();
+            }
+
+            if (m_SearchGroup == kRecent)
+            {
+                return matches.Where(b => recentRank.ContainsKey(b.Name)).OrderBy(b => recentRank[b.Name]).ToList();
             }
 
             var group = kGroups.FirstOrDefault(x => x.Id == m_SearchGroup);
@@ -790,12 +836,15 @@ namespace BlockBuilder
             var all = Search(out var counts);
             var palette = PaletteStore.Get(o.ActivePalette);
             var inList = new HashSet<string>(palette?.Entries.Select(e => e.Prefab) ?? Enumerable.Empty<string>());
+            var favorites = new HashSet<string>(Setting.Lines(o.FavoriteItems));
             var sb = new StringBuilder(8192);
             sb.Append('{');
             Prop(sb, "total", all.Count);
             Prop(sb, "group", m_SearchGroup);
             Prop(sb, "category", m_SearchCategory);
             Prop(sb, "anyCount", counts.Values.Sum());
+            Prop(sb, "favoriteCount", m_FavoriteCount);
+            Prop(sb, "recentCount", m_RecentCount);
             Prop(sb, "theme", m_SearchTheme);
             Prop(sb, "width", m_SearchWidth);
             Prop(sb, "widthOp", (int)m_SearchWidthOp);
@@ -818,6 +867,7 @@ namespace BlockBuilder
                 Prop(sb, "label", PrefabNames.Of(b.Name));
                 Prop(sb, "size", $"{b.LotWidth}x{b.LotDepth}");
                 Prop(sb, "thumb", Thumb(b));
+                Prop(sb, "fav", favorites.Contains(b.Name));
                 Prop(sb, "inList", inList.Contains(b.Name), last: true);
                 sb.Append('}');
             }
@@ -922,7 +972,7 @@ namespace BlockBuilder
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}";
+                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}|{options.FavoriteItems}|{options.RecentItems}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;
