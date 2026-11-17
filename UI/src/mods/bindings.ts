@@ -82,9 +82,31 @@ export interface SearchResult {
     inList: boolean;
 }
 
+export interface UseSub {
+    id: number;
+    label: string;
+    icon: string;
+    count: number;
+}
+
+export interface UseGroup {
+    id: string;
+    label: string;
+    icon: string;
+    count: number;
+    /** Sub-categories; empty when the group is a single category. */
+    subs: UseSub[];
+}
+
 export interface Search {
     total: number;
+    /** Open use group, "" for all uses. */
+    group: string;
+    /** Sub-category inside the group, -1 for the whole group. */
     category: number;
+    /** Matches with every filter but the use. */
+    anyCount: number;
+    groups: UseGroup[];
     theme: string;
     width: number;
     widthOp: number;
@@ -93,7 +115,6 @@ export interface Search {
     text: string;
     maxAddAll: number;
     results: SearchResult[];
-    categories: { id: number; label: string }[];
     themes: string[];
 }
 
@@ -102,7 +123,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, category: -1, theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], categories: [], themes: [] };
+const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {
@@ -212,6 +233,7 @@ export const actions = {
     addItem: (name: string) => trigger(GROUP, "addItem", name),
     addResults: () => trigger(GROUP, "addResults"),
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
+    setSearchGroup: (g: string) => trigger(GROUP, "setSearchGroup", g),
     setSearchCategory: (c: number) => trigger(GROUP, "setSearchCategory", c),
     setSearchTheme: (s: string) => trigger(GROUP, "setSearchTheme", s),
     setSearchWidth: (n: number) => trigger(GROUP, "setSearchWidth", n),

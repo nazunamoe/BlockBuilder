@@ -464,9 +464,16 @@ namespace BlockBuilder
             }));
 
             // ---- Catalog search (not persisted) ----
-            AddBinding(m_Search = new ValueBinding<string>(kGroup, "search", "{\"total\":0,\"results\":[],\"categories\":[],\"themes\":[]}"));
+            AddBinding(m_Search = new ValueBinding<string>(kGroup, "search", "{\"total\":0,\"results\":[],\"groups\":[],\"themes\":[]}"));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchText", s => { m_SearchText = s ?? string.Empty; m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c => { m_SearchCategory = c; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<string>(kGroup, "setSearchGroup", g => { m_SearchGroup = kGroups.Any(x => x.Id == g) ? g : string.Empty; m_SearchCategory = -1; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c =>
+            {
+                // A sub-category of the open group, or -1 for the whole group.
+                var group = kGroups.FirstOrDefault(x => x.Id == m_SearchGroup);
+                m_SearchCategory = group != null && group.Subs.Any(s => (int)s.Category == c) ? c : -1;
+                m_SearchKey = null;
+            }));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchTheme", s => { m_SearchTheme = s ?? string.Empty; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidth", n => { m_SearchWidth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidthOp", n => { m_SearchWidthOp = ToCompare(n); m_SearchKey = null; }));
@@ -483,8 +490,92 @@ namespace BlockBuilder
 
         private ValueBinding<string> m_Search;
         private string m_SearchText = string.Empty;
+        /// <summary>Open use group ("" = all uses) and, inside it, one sub-category (-1 = the whole group).</summary>
+        private string m_SearchGroup = string.Empty;
         private int m_SearchCategory = -1;
         private string m_SearchTheme = string.Empty;
+
+        private sealed class UseSub
+        {
+            public Core.ItemCategory Category;
+            public string En;
+            public string Ko;
+            public string Icon;
+        }
+
+        private sealed class UseGroup
+        {
+            public string Id;
+            public string En;
+            public string Ko;
+            public string Icon;
+            /// <summary>Categories in the group; shown as sub-filters when there is more than one.</summary>
+            public UseSub[] Subs;
+        }
+
+        private static UseSub Sub(Core.ItemCategory c, string en, string ko, string icon) => new UseSub { Category = c, En = en, Ko = ko, Icon = icon };
+
+        private const string kIcons = "Media/Game/Icons/";
+
+        /// <summary>Use groups as the game's zoning menu shows them, with its own icons.</summary>
+        private static readonly UseGroup[] kGroups =
+        {
+            new UseGroup
+            {
+                Id = "residential", En = "Residential", Ko = "주거", Icon = kIcons + "ZoneResidential.svg",
+                Subs = new[]
+                {
+                    Sub(Core.ItemCategory.ResidentialLow, "Low density", "저밀도", kIcons + "ZoneResidentialLow.svg"),
+                    Sub(Core.ItemCategory.ResidentialMedium, "Medium density", "중밀도", kIcons + "ZoneResidentialMedium.svg"),
+                    Sub(Core.ItemCategory.ResidentialHigh, "High density", "고밀도", kIcons + "ZoneResidentialHigh.svg"),
+                    Sub(Core.ItemCategory.ResidentialMixed, "Mixed", "혼합", kIcons + "ZoneResidentialMixed.svg"),
+                    Sub(Core.ItemCategory.ResidentialLowRent, "Low rent", "저임대", kIcons + "ZoneResidentialLowRent.svg"),
+                },
+            },
+            new UseGroup
+            {
+                Id = "commercial", En = "Commercial", Ko = "상업", Icon = kIcons + "ZoneCommercial.svg",
+                Subs = new[]
+                {
+                    Sub(Core.ItemCategory.CommercialLow, "Low density", "저밀도", kIcons + "ZoneCommercialLow.svg"),
+                    Sub(Core.ItemCategory.CommercialHigh, "High density", "고밀도", kIcons + "ZoneCommercialHigh.svg"),
+                },
+            },
+            new UseGroup
+            {
+                Id = "office", En = "Office", Ko = "사무", Icon = kIcons + "ZoneOffice.svg",
+                Subs = new[] { Sub(Core.ItemCategory.Office, "Office", "사무", kIcons + "ZoneOffice.svg") },
+            },
+            new UseGroup
+            {
+                Id = "industrial", En = "Industrial", Ko = "산업", Icon = kIcons + "ZoneIndustrial.svg",
+                Subs = new[]
+                {
+                    Sub(Core.ItemCategory.Industrial, "General", "일반", kIcons + "ZoneIndustrialManufacturing.svg"),
+                    Sub(Core.ItemCategory.SpecializedIndustry, "Specialized", "특화", kIcons + "ZoneExtractors.svg"),
+                },
+            },
+            new UseGroup
+            {
+                Id = "service", En = "Services", Ko = "서비스", Icon = kIcons + "Services.svg",
+                Subs = new[] { Sub(Core.ItemCategory.Service, "Services", "서비스", kIcons + "Services.svg") },
+            },
+            new UseGroup
+            {
+                Id = "park", En = "Parks", Ko = "공원", Icon = kIcons + "ParksAndRecreation.svg",
+                Subs = new[] { Sub(Core.ItemCategory.Park, "Parks", "공원", kIcons + "ParksAndRecreation.svg") },
+            },
+            new UseGroup
+            {
+                Id = "parking", En = "Parking", Ko = "주차장", Icon = kIcons + "Parking.svg",
+                Subs = new[] { Sub(Core.ItemCategory.Parking, "Parking", "주차장", kIcons + "Parking.svg") },
+            },
+            new UseGroup
+            {
+                Id = "other", En = "Other", Ko = "기타", Icon = kIcons + "Zones.svg",
+                Subs = new[] { Sub(Core.ItemCategory.Other, "Other", "기타", kIcons + "Zones.svg") },
+            },
+        };
         // Lot size filter in cells (0 = any), each with its own < / = / > comparison.
         private int m_SearchWidth;
         private int m_SearchDepth;
@@ -616,13 +707,42 @@ namespace BlockBuilder
             }
         }
 
-        private List<BuildingEntry> Search()
+        private List<BuildingEntry> Search() => Search(out _);
+
+        /// <summary>
+        /// Buildings matching every filter; <paramref name="counts"/> gets the matches per category
+        /// with every filter but the use, so each use button can show how many it would give.
+        /// </summary>
+        private List<BuildingEntry> Search(out Dictionary<Core.ItemCategory, int> counts)
         {
+            counts = new Dictionary<Core.ItemCategory, int>();
             if (!m_Catalog.Ready)
             {
                 return new List<BuildingEntry>();
             }
 
+            var matches = SearchAnyUse();
+            foreach (var b in matches)
+            {
+                var c = b.Item.Category;
+                counts.TryGetValue(c, out int n);
+                counts[c] = n + 1;
+            }
+
+            var group = kGroups.FirstOrDefault(x => x.Id == m_SearchGroup);
+            if (group == null)
+            {
+                return matches;
+            }
+
+            var uses = m_SearchCategory >= 0
+                ? new HashSet<Core.ItemCategory> { (Core.ItemCategory)m_SearchCategory }
+                : new HashSet<Core.ItemCategory>(group.Subs.Select(s => s.Category));
+            return matches.Where(b => uses.Contains(b.Item.Category)).ToList();
+        }
+
+        private List<BuildingEntry> SearchAnyUse()
+        {
             var filter = new Core.CatalogFilter
             {
                 Text = m_SearchText.Trim(),
@@ -630,10 +750,6 @@ namespace BlockBuilder
                 IncludeSignature = true,
                 IncludeWaterfront = true,
             };
-            if (m_SearchCategory >= 0)
-            {
-                filter.Categories.Add((Core.ItemCategory)m_SearchCategory);
-            }
 
             if (!string.IsNullOrEmpty(m_SearchTheme))
             {
@@ -648,13 +764,15 @@ namespace BlockBuilder
 
         private string BuildSearch(Setting o)
         {
-            var all = Search();
+            var all = Search(out var counts);
             var palette = PaletteStore.Get(o.ActivePalette);
             var inList = new HashSet<string>(palette?.Entries.Select(e => e.Prefab) ?? Enumerable.Empty<string>());
             var sb = new StringBuilder(8192);
             sb.Append('{');
             Prop(sb, "total", all.Count);
+            Prop(sb, "group", m_SearchGroup);
             Prop(sb, "category", m_SearchCategory);
+            Prop(sb, "anyCount", counts.Values.Sum());
             Prop(sb, "theme", m_SearchTheme);
             Prop(sb, "width", m_SearchWidth);
             Prop(sb, "widthOp", (int)m_SearchWidthOp);
@@ -680,13 +798,14 @@ namespace BlockBuilder
                 sb.Append('}');
             }
 
-            sb.Append("],\"categories\":[");
+            sb.Append("],\"groups\":[");
             first = true;
-            foreach (Core.ItemCategory c in System.Enum.GetValues(typeof(Core.ItemCategory)))
+            foreach (var g in kGroups)
             {
-                if (c == Core.ItemCategory.Other)
+                int groupCount = g.Subs.Sum(s => counts.TryGetValue(s.Category, out int n) ? n : 0);
+                if (g.Id == "other" && groupCount == 0 && m_SearchGroup != g.Id)
                 {
-                    continue;
+                    continue; // only shown when something is unclassified
                 }
 
                 if (!first)
@@ -696,9 +815,26 @@ namespace BlockBuilder
 
                 first = false;
                 sb.Append('{');
-                Prop(sb, "id", (int)c);
-                Prop(sb, "label", Mod.IsKorean ? BuilderLocale.CategoryKo(c) : c.ToString(), last: true);
-                sb.Append('}');
+                Prop(sb, "id", g.Id);
+                Prop(sb, "label", Mod.IsKorean ? g.Ko : g.En);
+                Prop(sb, "icon", g.Icon);
+                Prop(sb, "count", groupCount);
+                sb.Append("\"subs\":[");
+                if (g.Subs.Length > 1)
+                {
+                    for (int k = 0; k < g.Subs.Length; k++)
+                    {
+                        var s = g.Subs[k];
+                        sb.Append(k > 0 ? ",{" : "{");
+                        Prop(sb, "id", (int)s.Category);
+                        Prop(sb, "label", Mod.IsKorean ? s.Ko : s.En);
+                        Prop(sb, "icon", s.Icon);
+                        Prop(sb, "count", counts.TryGetValue(s.Category, out int n) ? n : 0, last: true);
+                        sb.Append('}');
+                    }
+                }
+
+                sb.Append("]}");
             }
 
             sb.Append("],\"themes\":");
@@ -759,7 +895,7 @@ namespace BlockBuilder
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
+                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{Mod.IsKorean}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;

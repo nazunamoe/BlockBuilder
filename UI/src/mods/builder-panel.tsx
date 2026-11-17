@@ -17,8 +17,11 @@ const MouseToolOptions: any = (() => {
 })();
 
 const PANEL_WIDTH = 380;
+/** Wider while adding buildings, so the picture grid has room (like Find It). */
+const ADD_PANEL_WIDTH = 560;
 const POS_KEY = "blockBuilder.panelPos";
 const TAB_KEY = "blockBuilder.tab";
+const VIEW_KEY = "blockBuilder.addView";
 const DEFAULT_POS = { x: 12, y: 120 };
 
 type Tr = (k: string) => string;
@@ -294,6 +297,17 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
         </>
     );
 }
+/** One use button: the game's zoning icon, the name and how many buildings it gives. */
+function UseTile({ label, icon, count, on, onClick }: { label: string; icon: string; count: number; on: boolean; onClick: () => void }) {
+    return (
+        <button className={`${styles.useTile} ${on ? styles.useTileOn : ""} ${count === 0 && !on ? styles.dim : ""}`} onClick={onClick}>
+            <img className={styles.useIcon} src={icon} />
+            <span className={styles.useLabel}>{label}</span>
+            <span className={styles.useCount}>{count}</span>
+        </button>
+    );
+}
+
 /** Catalog search that adds to the current list; replaces the list view until Back. */
 function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lists: Lists; state: BuilderState; t: Tr; onBack: () => void }) {
     // Start from the text the C# side still filters by (it survives a UI reload).
@@ -305,6 +319,12 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
     };
     const tooMany = search.total > search.maxAddAll;
     const current = lists.palettes[state.palette];
+    const openGroup = search.groups.find((g) => g.id === search.group);
+    const [view, setViewState] = useState<string>(() => (loadJson(VIEW_KEY, { view: "grid" }).view === "list" ? "list" : "grid"));
+    const setView = (v: string) => {
+        setViewState(v);
+        saveJson(VIEW_KEY, { view: v });
+    };
 
     return (
         <>
@@ -321,16 +341,33 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
             <div className={styles.fieldLabel}>{t("searchName")}</div>
             <TextField value={query ?? search.text} onChange={onQuery} />
 
-            <div className={styles.chipWrap}>
-                <button className={`${styles.chip} ${search.category < 0 ? styles.chipOn : ""}`} onClick={() => actions.setSearchCategory(-1)}>
-                    {t("anyCategory")}
-                </button>
-                {search.categories.map((c) => (
-                    <button key={c.id} className={`${styles.chip} ${search.category === c.id ? styles.chipOn : ""}`} onClick={() => actions.setSearchCategory(c.id)}>
-                        {c.label}
-                    </button>
+            <div className={styles.fieldLabel}>{t("use")}</div>
+            <div className={styles.useRow}>
+                <UseTile label={t("anyCategory")} icon="Media/Game/Icons/Zones.svg" count={search.anyCount} on={openGroup === undefined} onClick={() => actions.setSearchGroup("")} />
+                {search.groups.map((g) => (
+                    <UseTile key={g.id} label={g.label} icon={g.icon} count={g.count} on={openGroup?.id === g.id} onClick={() => actions.setSearchGroup(g.id)} />
                 ))}
             </div>
+            {openGroup && openGroup.subs.length > 0 && (
+                <div className={styles.subRow}>
+                    <button className={`${styles.subChip} ${search.category < 0 ? styles.subChipOn : ""}`} onClick={() => actions.setSearchCategory(-1)}>
+                        {t("allOf")} {openGroup.label}
+                        <span className={styles.subCount}>{openGroup.count}</span>
+                    </button>
+                    {openGroup.subs.map((s) => (
+                        <button
+                            key={s.id}
+                            className={`${styles.subChip} ${search.category === s.id ? styles.subChipOn : ""}`}
+                            disabled={s.count === 0 && search.category !== s.id}
+                            onClick={() => actions.setSearchCategory(s.id)}
+                        >
+                            <img className={styles.subIcon} src={s.icon} />
+                            {s.label}
+                            <span className={styles.subCount}>{s.count}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {search.themes.length > 0 && (
                 <div className={styles.chipWrap}>
@@ -355,13 +392,47 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                     <b>{search.total}</b> {t("results")}
                     {search.total > search.results.length ? ` · ${t("showingFirst")}` : ""}
                 </span>
-                <button className={`${styles.chip} ${styles.chipPrimary}`} disabled={search.total === 0 || tooMany || !current} onClick={actions.addResults}>
-                    {tooMany ? `${t("addAllTooMany")} ${search.maxAddAll}` : `${t("addAll")} (${search.total})`}
-                </button>
+                <div className={styles.resultTools}>
+                    <button className={`${styles.chip} ${view === "grid" ? styles.chipOn : ""}`} onClick={() => setView("grid")}>
+                        {t("viewGrid")}
+                    </button>
+                    <button className={`${styles.chip} ${view === "list" ? styles.chipOn : ""}`} onClick={() => setView("list")}>
+                        {t("viewList")}
+                    </button>
+                    <button className={`${styles.chip} ${styles.chipPrimary}`} disabled={search.total === 0 || tooMany || !current} onClick={actions.addResults}>
+                        {tooMany ? `${t("addAllTooMany")} ${search.maxAddAll}` : `${t("addAll")} (${search.total})`}
+                    </button>
+                </div>
             </div>
 
             {search.results.length === 0 ? (
                 <div className={styles.empty}>{t("noResults")}</div>
+            ) : view === "grid" ? (
+                <Scrollable className={styles.gridList} vertical>
+                    <div className={styles.grid}>
+                        {search.results.map((r) => (
+                            <button
+                                key={r.name}
+                                className={`${styles.tile} ${r.inList ? styles.tileOn : ""}`}
+                                disabled={!current}
+                                onMouseEnter={() => setHover(r)}
+                                onMouseLeave={() => setHover(null)}
+                                onClick={() => (r.inList ? actions.removeItemByName(r.name) : actions.addItem(r.name))}
+                            >
+                                <div className={styles.tileImageWrap}>
+                                    <Thumb src={r.thumb} className={styles.tileImage} />
+                                    <span className={styles.tileSize}>{r.size}</span>
+                                    {r.inList && (
+                                        <span className={styles.tileCheck}>
+                                            <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />
+                                        </span>
+                                    )}
+                                </div>
+                                <span className={styles.tileName}>{r.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </Scrollable>
             ) : (
                 <Scrollable className={styles.itemList} vertical>
                     {search.results.map((r) => (
@@ -576,12 +647,16 @@ export const BuilderPanel = () => {
     const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, { width: PANEL_WIDTH, height: 600 });
     const [tab, setTabState] = useState<Tab>(() => (loadJson(TAB_KEY, { tab: "buildings" }).tab === "settings" ? "settings" : "buildings"));
     const [adding, setAdding] = useState(false);
+    const wide = adding && tab === "buildings";
+    const width = wide ? ADD_PANEL_WIDTH : PANEL_WIDTH;
 
     // Fit the window on screen: measure where it actually is and give the scrolling body whatever
     // height is left down to the bottom of the screen (units of the computed layout, so no rem/px guess).
+    // When the wider add view would run off the right edge, the window is drawn further left.
     const windowRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
     const [bodyMax, setBodyMax] = useState(480);
+    const [shiftLeft, setShiftLeft] = useState(0);
     useEffect(() => {
         const w = windowRef.current;
         const b = bodyRef.current;
@@ -589,11 +664,16 @@ export const BuilderPanel = () => {
             return;
         }
         const screen = window.innerHeight || document.documentElement.clientHeight || 1080;
+        const screenW = window.innerWidth || document.documentElement.clientWidth || 1920;
         const wr = w.getBoundingClientRect();
         const chrome = wr.height - b.getBoundingClientRect().height;
         const available = Math.max(160, Math.floor(screen - wr.top - chrome - 12));
         if (Math.abs(available - bodyMax) > 2) {
             setBodyMax(available);
+        }
+        const shift = Math.min(pos.x, Math.max(0, Math.ceil(pos.x + wr.width - screenW + 8)));
+        if (Math.abs(shift - shiftLeft) > 2) {
+            setShiftLeft(shift);
         }
     });
 
@@ -608,7 +688,7 @@ export const BuilderPanel = () => {
     };
 
     return (
-        <div ref={windowRef} className={styles.window} style={{ left: `${pos.x}px`, top: `${pos.y}px`, width: `${PANEL_WIDTH}rem` }}>
+        <div ref={windowRef} className={styles.window} style={{ left: `${pos.x - shiftLeft}px`, top: `${pos.y}px`, width: `${width}rem` }}>
             <div className={styles.titleBar} onMouseDown={onHandleDown}>
                 <span className={styles.title}>Block Builder</span>
                 <button className={styles.iconButton} title={t("resetPos")} onMouseDown={(e) => e.stopPropagation()} onClick={reset}>
