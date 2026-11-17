@@ -90,6 +90,8 @@ export interface SearchResult {
     label: string;
     /** Starred. */
     fav: boolean;
+    /** Growable level 1..5; 0 for buildings without levels. */
+    lv: number;
     size: string;
     thumb: string;
     inList: boolean;
@@ -120,6 +122,8 @@ export interface Search {
     /** Matches with every filter but the use. */
     anyCount: number;
     favoriteCount: number;
+    /** Level filter 1..5, 0 = any. */
+    level: number;
     recentCount: number;
     groups: UseGroup[];
     theme: string;
@@ -138,7 +142,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
+const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {
@@ -251,6 +255,7 @@ export const actions = {
     addItem: (name: string) => trigger(GROUP, "addItem", name),
     addResults: () => trigger(GROUP, "addResults"),
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
+    setSearchLevel: (n: number) => trigger(GROUP, "setSearchLevel", n),
     setSearchGroup: (g: string) => trigger(GROUP, "setSearchGroup", g),
     toggleFavorite: (name: string) => trigger(GROUP, "toggleFavorite", name),
     setItemWeight: (index: number, weight: number) => trigger(GROUP, "setItemWeight", index, weight),

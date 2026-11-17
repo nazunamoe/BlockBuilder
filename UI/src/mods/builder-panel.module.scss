@@ -1423,3 +1423,14 @@ $radius: 6rem;
     width: auto;
     margin: 0 12rem 6rem 12rem;
 }
+
+.tileLevel {
+    position: absolute;
+    right: 3rem;
+    bottom: 3rem;
+    padding: 1rem 5rem;
+    color: $text;
+    font-size: 10rem;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 8rem;
+}

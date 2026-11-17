@@ -490,6 +490,7 @@ namespace BlockBuilder
                 m_SearchKey = null;
             }));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchTheme", s => { m_SearchTheme = s ?? string.Empty; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchLevel", n => { m_SearchLevel = System.Math.Max(0, System.Math.Min(5, n)); m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidth", n => { m_SearchWidth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidthOp", n => { m_SearchWidthOp = ToCompare(n); m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchDepth", n => { m_SearchDepth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
@@ -508,6 +509,8 @@ namespace BlockBuilder
         /// <summary>Open use group ("" = all uses) and, inside it, one sub-category (-1 = the whole group).</summary>
         private string m_SearchGroup = string.Empty;
         private int m_SearchCategory = -1;
+        /// <summary>Growable level 1..5, or 0 for any (other buildings have no level and drop out).</summary>
+        private int m_SearchLevel;
         private string m_SearchTheme = string.Empty;
 
         private sealed class UseSub
@@ -829,7 +832,9 @@ namespace BlockBuilder
             filter.SetWidth(m_SearchWidthOp, m_SearchWidth);
             filter.SetDepth(m_SearchDepthOp, m_SearchDepth);
 
-            return m_Catalog.Buildings.Where(b => filter.Matches(b.Item)).GroupBy(b => b.Name).Select(g => g.First()).ToList();
+            return m_Catalog.Buildings
+                .Where(b => filter.Matches(b.Item) && (m_SearchLevel == 0 || (b.Kind & EntryKind.Growable) != 0 && b.Level == m_SearchLevel))
+                .GroupBy(b => b.Name).Select(g => g.First()).ToList();
         }
 
         private string BuildSearch(Setting o)
@@ -846,6 +851,7 @@ namespace BlockBuilder
             Prop(sb, "anyCount", counts.Values.Sum());
             Prop(sb, "favoriteCount", m_FavoriteCount);
             Prop(sb, "recentCount", m_RecentCount);
+            Prop(sb, "level", m_SearchLevel);
             Prop(sb, "theme", m_SearchTheme);
             Prop(sb, "width", m_SearchWidth);
             Prop(sb, "widthOp", (int)m_SearchWidthOp);
@@ -867,6 +873,7 @@ namespace BlockBuilder
                 Prop(sb, "name", b.Name);
                 Prop(sb, "label", PrefabNames.Of(b.Name));
                 Prop(sb, "size", $"{b.LotWidth}x{b.LotDepth}");
+                Prop(sb, "lv", (b.Kind & EntryKind.Growable) != 0 ? b.Level : 0);
                 Prop(sb, "thumb", Thumb(b));
                 Prop(sb, "fav", favorites.Contains(b.Name));
                 Prop(sb, "inList", inList.Contains(b.Name), last: true);
@@ -973,7 +980,7 @@ namespace BlockBuilder
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}|{options.FavoriteItems}|{options.RecentItems}";
+                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchLevel}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}|{options.FavoriteItems}|{options.RecentItems}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;

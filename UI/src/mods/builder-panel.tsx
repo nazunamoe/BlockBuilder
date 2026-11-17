@@ -566,6 +566,16 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                 </div>
             )}
 
+            <div className={styles.chipWrap}>
+                <span className={styles.fieldLabelInline}>{t("level")}</span>
+                {[0, 1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} className={`${styles.chip} ${search.level === n ? styles.chipOn : ""}`} onClick={() => actions.setSearchLevel(n)}>
+                        {n === 0 ? t("anyLevel") : `${n}`}
+                    </button>
+                ))}
+                {search.level > 0 && <span className={styles.note}>{t("levelHint")}</span>}
+            </div>
+
             <div className={styles.fieldLabel}>{t("lotSize")}</div>
             <SizeFilter label={t("lotWidth")} value={search.width} op={search.widthOp} anyLabel={t("anySize")} onValue={actions.setSearchWidth} onOp={actions.setSearchWidthOp} />
             <SizeFilter label={t("lotDepth")} value={search.depth} op={search.depthOp} anyLabel={t("anySize")} onValue={actions.setSearchDepth} onOp={actions.setSearchDepthOp} />
@@ -599,6 +609,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                                 <div className={styles.tileImageWrap}>
                                     <Thumb src={r.thumb} className={styles.tileImage} />
                                     <span className={styles.tileSize}>{r.size}</span>
+                                    {r.lv > 0 && <span className={styles.tileLevel}>Lv{r.lv}</span>}
                                     <Star on={r.fav} className={styles.tileStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
                                     {r.inList && (
                                         <span className={styles.tileCheck}>
@@ -619,6 +630,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                             <div className={styles.itemName}>
                                 <Thumb src={r.thumb} className={styles.thumb} />
                                 <span className={styles.name}>{r.label || r.name}</span>
+                                {r.lv > 0 && <span className={styles.badge}>Lv{r.lv}</span>}
                                 <span className={styles.badge}>{r.size}</span>
                             </div>
                             {r.inList ? (
