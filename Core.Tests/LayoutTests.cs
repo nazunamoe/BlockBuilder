@@ -95,6 +95,30 @@ namespace BlockBuilder.Core.Tests
             Assert.Equal(2, counts["rare"]);
         }
 
+        /// <summary>
+        /// Two pinned lots off the 8 m search grid with exactly one lot of room between them (what a
+        /// drag leaves behind): the gap is filled flush, not skipped by the coarse step.
+        /// </summary>
+        [Theory]
+        [InlineData(SizeOrder.Mixed, 0)]
+        [InlineData(SizeOrder.LargeFirst, 0)]
+        [InlineData(SizeOrder.Mixed, 1)]
+        public void GapBetweenPinnedLots_IsFilledFlush(SizeOrder order, int variant)
+        {
+            Placement Pinned(double x0) => new Placement { ItemId = "house", Box = new Obb(new Vec2(x0 + 8, 8), new Vec2(0, -1), 16, 16) };
+            var request = new LayoutRequest
+            {
+                Boundary = Rect(0, 0, 80, 20),
+                ExistingRoads = { Road(-20, -4, 100, -4) },
+                Items = { Item("house", 2, 2) },
+                Fixed = { Pinned(3), Pinned(35) },
+                Options = { Order = order, Variant = variant },
+            };
+            var result = LayoutEngine.Run(request);
+            AssertValid(request, result);
+            Assert.Contains(result.Placements, p => !p.IsFixed && Math.Abs(p.Box.Center.X - 27) < 0.05);
+        }
+
         [Fact]
         public void LargeFirst_StartsWithTheBiggestAndDoesNotRepeatWhileOthersFit()
         {

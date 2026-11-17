@@ -67,6 +67,30 @@ namespace BlockBuilder.Core
             return len < 1e-12 ? Points[k] : Vec2.Lerp(Points[k], Points[k + 1], (s - Cum[k]) / len);
         }
 
+        /// <summary>Arc length of the curb point nearest to <paramref name="p"/>, and how far away it is.</summary>
+        public double Project(Vec2 p, out double distance)
+        {
+            distance = double.MaxValue;
+            double best = 0;
+            if (Points.Count == 1)
+            {
+                distance = Vec2.Distance(Points[0], p);
+                return 0;
+            }
+
+            for (int k = 0; k + 1 < Points.Count; k++)
+            {
+                double d = Segment.Distance(Points[k], Points[k + 1], p, out double t);
+                if (d < distance)
+                {
+                    distance = d;
+                    best = Cum[k] + t * (Cum[k + 1] - Cum[k]);
+                }
+            }
+
+            return best;
+        }
+
         private Vec2 DirAt(double s)
         {
             int k = SegmentAt(s);

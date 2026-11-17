@@ -26,6 +26,8 @@ namespace BlockBuilder.Core
             public Random Rng;
             /// <summary>Items placed last, newest at the end; sized orders avoid repeating them.</summary>
             public readonly List<string> Recent = new List<string>();
+            /// <summary>Lots placed by hand or pinned after a move (see FixedAnchors).</summary>
+            public readonly List<Obb> FixedBoxes = new List<Obb>();
             /// <summary>Copies per item in <see cref="Recent"/> (rounded weight, at least 1).</summary>
             public readonly Dictionary<string, int> Weights = new Dictionary<string, int>(StringComparer.Ordinal);
             /// <summary>Lots and buildings: may be overlapped by the overlap allowances.</summary>
@@ -63,6 +65,7 @@ namespace BlockBuilder.Core
                 item.IsFixed = true;
                 result.Placements.Add(item);
                 ctx.Obstacles.Add(item.Box);
+                ctx.FixedBoxes.Add(item.Box);
                 Count(ctx, item.ItemId);
             }
 
@@ -496,8 +499,18 @@ namespace BlockBuilder.Core
             // Right after a lot, search finely: on the inside of a bend the next lot only fits a
             // little further on (the backs converge), and a full step would waste most of a lot.
             double lastEnd = double.NegativeInfinity;
+            // Ends of hand-placed and pinned lots on this road: the walk also stops exactly there,
+            // so a gap they leave (e.g. where a lot was dragged away) starts flush with them
+            // instead of up to a whole step later.
+            var anchors = FixedAnchors(ctx, front, reverse);
+            int nextAnchor = 0;
             while (true)
             {
+                while (nextAnchor < anchors.Count && anchors[nextAnchor] <= t + 1e-6)
+                {
+                    nextAnchor++;
+                }
+
                 var candidates = items.Where(i => Available(ctx, i) && i.Width <= front.Length - t + 1e-6).ToList();
                 if (candidates.Count == 0)
                 {
@@ -542,9 +555,54 @@ namespace BlockBuilder.Core
 
                 if (!placed)
                 {
-                    t += t - lastEnd < ctx.Options.Step ? Math.Min(1, ctx.Options.Step) : ctx.Options.Step;
+                    double next = t + (t - lastEnd < ctx.Options.Step ? Math.Min(1, ctx.Options.Step) : ctx.Options.Step);
+                    if (nextAnchor < anchors.Count && anchors[nextAnchor] < next)
+                    {
+                        next = anchors[nextAnchor];
+                        lastEnd = next; // search finely from a lot's end, as after a placed one
+                    }
+
+                    t = next;
                 }
             }
+        }
+
+        /// <summary>
+        /// Walk positions (arc length from the walk's start) just past each fixed lot that fronts
+        /// this road, plus the gap; sorted. Only lots whose front touches the curb count.
+        /// </summary>
+        private static List<double> FixedAnchors(Context ctx, Frontage front, bool reverse)
+        {
+            var anchors = new List<double>();
+            double gap = Math.Max(0, ctx.Options.Gap);
+            foreach (var box in ctx.FixedBoxes)
+            {
+                // Front edge midpoint: the side facing the road.
+                Vec2 frontMid = box.Center + box.Forward * (box.Depth / 2);
+                front.Project(frontMid, out double distance);
+                if (distance > 2)
+                {
+                    continue;
+                }
+
+                double lo = double.MaxValue, hi = double.MinValue;
+                foreach (var corner in box.Corners())
+                {
+                    double s = front.Project(corner, out _);
+                    lo = Math.Min(lo, s);
+                    hi = Math.Max(hi, s);
+                }
+
+                double end = reverse ? front.Length - lo : hi;
+                end += gap;
+                if (end > 0 && end < front.Length)
+                {
+                    anchors.Add(end);
+                }
+            }
+
+            anchors.Sort();
+            return anchors;
         }
 
         private static void FillInterior(Context ctx, List<PaletteItem> items)
