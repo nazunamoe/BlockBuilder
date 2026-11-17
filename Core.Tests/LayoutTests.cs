@@ -55,6 +55,46 @@ namespace BlockBuilder.Core.Tests
             return result;
         }
 
+        private static Dictionary<string, int> LongRow(SizeOrder order, params PaletteItem[] items)
+        {
+            var request = new LayoutRequest
+            {
+                Boundary = Rect(0, 0, 800, 20),
+                ExistingRoads = { Road(-20, -4, 840, -4) },
+                Options = { Order = order, SizeBy = SizeKey.Width },
+            };
+            request.Items.AddRange(items);
+            var result = LayoutEngine.Run(request);
+            AssertValid(request, result);
+            return result.Placements.GroupBy(p => p.ItemId).ToDictionary(g => g.Key, g => g.Count());
+        }
+
+        [Theory]
+        [InlineData(SizeOrder.LargeFirst)]
+        [InlineData(SizeOrder.SmallFirst)]
+        public void SizedOrder_HeavierItemIsUsedMoreOften(SizeOrder order)
+        {
+            var counts = LongRow(order, Item("heavy", 2, 2, weight: 3), Item("light", 2, 2, weight: 1));
+            Assert.True(counts["light"] > 0, "the lighter item is still used");
+            Assert.True(counts["heavy"] >= 2 * counts["light"], $"heavy {counts["heavy"]} vs light {counts["light"]}");
+        }
+
+        [Fact]
+        public void SizedOrder_EqualWeights_Alternate()
+        {
+            var counts = LongRow(SizeOrder.LargeFirst, Item("a", 2, 2), Item("b", 2, 2));
+            Assert.InRange(counts["a"] - counts["b"], -1, 1);
+        }
+
+        [Theory]
+        [InlineData(SizeOrder.Mixed)]
+        [InlineData(SizeOrder.LargeFirst)]
+        public void MaxCount_IsNeverExceeded(SizeOrder order)
+        {
+            var counts = LongRow(order, Item("rare", 2, 2, weight: 5, max: 2), Item("common", 2, 2));
+            Assert.Equal(2, counts["rare"]);
+        }
+
         [Fact]
         public void LargeFirst_StartsWithTheBiggestAndDoesNotRepeatWhileOthersFit()
         {

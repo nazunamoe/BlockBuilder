@@ -252,9 +252,14 @@ function ViewToggle({ view, setView, t }: { view: View; setView: (v: View) => vo
 
 function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void }) {
     const [confirmClear, setConfirmClear] = useState(false);
-    const [hover, setHover] = useState<EntryInfo | null>(null);
+    // Hover previews a building; a click selects it for the weight and limit card below.
+    const [hover, setHover] = useState<number | null>(null);
+    const [selectedRaw, setSelected] = useState<number | null>(null);
     const [view, setView] = useView();
     const onlyChecked = state.scope === 1;
+    const selected = selectedRaw !== null && selectedRaw < lists.entries.length ? selectedRaw : null;
+    const shownIndex = hover !== null && hover < lists.entries.length ? hover : selected;
+    const shown = shownIndex !== null ? lists.entries[shownIndex] : null;
     const hasList = lists.palettes[state.palette] !== undefined;
 
     return (
@@ -316,68 +321,136 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
             ) : view === "grid" ? (
-                <>
-                    <Scrollable className={styles.gridList} vertical>
-                        <div className={styles.grid}>
-                            {lists.entries.map((e, i) => (
-                                <div
-                                    key={i}
-                                    className={`${styles.tile} ${styles.tileSmall} ${onlyChecked && e.checked ? styles.tileOn : ""} ${e.loaded ? "" : styles.dim}`}
-                                    onMouseEnter={() => setHover(e)}
-                                    onMouseLeave={() => setHover(null)}
-                                    onClick={() => onlyChecked && actions.toggleChecked(i)}
-                                >
-                                    <div className={styles.tileImageWrap}>
-                                        <Thumb src={e.thumb} className={`${styles.tileImage} ${styles.tileImageSmall}`} />
-                                        <span className={styles.tileSize}>{e.loaded ? e.size : t("notLoaded")}</span>
-                                        {onlyChecked && e.checked && (
-                                            <span className={styles.tileCheck}>
-                                                <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />
-                                            </span>
-                                        )}
+                <Scrollable className={styles.gridList} vertical>
+                    <div className={styles.grid}>
+                        {lists.entries.map((e, i) => (
+                            <div
+                                key={i}
+                                className={`${styles.tile} ${styles.tileSmall} ${selected === i ? styles.tileSelected : ""} ${onlyChecked && e.checked ? styles.tileOn : ""} ${e.loaded ? "" : styles.dim}`}
+                                onMouseEnter={() => setHover(i)}
+                                onMouseLeave={() => setHover(null)}
+                                onClick={() => setSelected(i)}
+                            >
+                                <div className={styles.tileImageWrap}>
+                                    <Thumb src={e.thumb} className={`${styles.tileImage} ${styles.tileImageSmall}`} />
+                                    <span className={styles.tileSize}>{e.loaded ? e.size : t("notLoaded")}</span>
+                                    <MixBadge entry={e} className={styles.tileMix} />
+                                    {onlyChecked && (
                                         <button
-                                            className={styles.tileRemove}
-                                            title={t("removeFromList")}
+                                            className={`${styles.tileCheck} ${e.checked ? "" : styles.tileCheckOff}`}
                                             onClick={(ev) => {
                                                 ev.stopPropagation();
-                                                actions.removeItem(i);
+                                                actions.toggleChecked(i);
                                             }}
                                         >
-                                            <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
+                                            {e.checked && <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />}
                                         </button>
-                                    </div>
-                                    <span className={styles.tileName}>{e.label || e.name}</span>
+                                    )}
+                                    <button
+                                        className={styles.tileRemove}
+                                        title={t("removeFromList")}
+                                        onClick={(ev) => {
+                                            ev.stopPropagation();
+                                            actions.removeItem(i);
+                                        }}
+                                    >
+                                        <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
-                    </Scrollable>
-                    <PreviewBox item={hover} t={t} />
-                </>
-            ) : (
-                <>
-                <Scrollable className={styles.itemList} vertical>
-                    {lists.entries.map((e, i) => {
-                        return (
-                            <div key={i} className={`${styles.itemRow} ${e.loaded ? "" : styles.dim}`} onMouseEnter={() => setHover(e)} onMouseLeave={() => setHover(null)}>
-                                {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
-                                <div className={styles.itemName}>
-                                    <Thumb src={e.thumb} className={styles.thumb} />
-                                    <span className={styles.name}>{e.label || e.name}</span>
-                                    <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
-                                </div>
-                                <button className={styles.removeButton} title={t("removeFromList")} onClick={() => actions.removeItem(i)}>
-                                    <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
-                                </button>
+                                <span className={styles.tileName}>{e.label || e.name}</span>
                             </div>
-                        );
-                    })}
+                        ))}
+                    </div>
                 </Scrollable>
-                <PreviewBox item={hover} t={t} />
-                </>
+            ) : (
+                <Scrollable className={styles.itemList} vertical>
+                    {lists.entries.map((e, i) => (
+                        <div
+                            key={i}
+                            className={`${styles.itemRow} ${selected === i ? styles.itemRowSelected : ""} ${e.loaded ? "" : styles.dim}`}
+                            onMouseEnter={() => setHover(i)}
+                            onMouseLeave={() => setHover(null)}
+                            onClick={() => setSelected(i)}
+                        >
+                            {onlyChecked && <Check checked={e.checked} onClick={() => actions.toggleChecked(i)} />}
+                            <div className={styles.itemName}>
+                                <Thumb src={e.thumb} className={styles.thumb} />
+                                <span className={styles.name}>{e.label || e.name}</span>
+                                <MixBadge entry={e} className={styles.badge} />
+                                <span className={styles.badge}>{e.loaded ? e.size : t("notLoaded")}</span>
+                            </div>
+                            <button
+                                className={styles.removeButton}
+                                title={t("removeFromList")}
+                                onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    actions.removeItem(i);
+                                }}
+                            >
+                                <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
+                            </button>
+                        </div>
+                    ))}
+                </Scrollable>
             )}
+
+            {lists.entries.length > 0 && <EntryDetail entry={shown} index={shownIndex} editable={shownIndex === selected} t={t} />}
         </>
     );
 }
+/** "x3" when picked more often, "max 2" when limited; nothing at the defaults. */
+function MixBadge({ entry, className }: { entry: EntryInfo; className: string }) {
+    if (entry.weight <= 1 && entry.max <= 0) {
+        return null;
+    }
+    return (
+        <span className={`${className} ${styles.mixBadge}`}>
+            {entry.weight > 1 ? `x${entry.weight}` : ""}
+            {entry.weight > 1 && entry.max > 0 ? " " : ""}
+            {entry.max > 0 ? `≤${entry.max}` : ""}
+        </span>
+    );
+}
+
+/** The hovered or selected building, with its weight and limit when it is the selected one. */
+function EntryDetail({ entry, index, editable, t }: { entry: EntryInfo | null; index: number | null; editable: boolean; t: Tr }) {
+    if (!entry || index === null) {
+        return (
+            <div className={styles.previewBox}>
+                <span className={styles.note}>{t("selectHint")}</span>
+            </div>
+        );
+    }
+    return (
+        <div className={styles.detailCard}>
+            <div className={styles.detailTop}>
+                <Thumb src={entry.thumb} className={styles.previewImage} />
+                <div className={styles.previewText}>
+                    <span className={styles.previewName}>{entry.label || entry.name}</span>
+                    {entry.label && entry.label !== entry.name && <span className={styles.previewPrefab}>{entry.name}</span>}
+                    <span className={styles.badge}>{entry.loaded ? entry.size : t("notLoaded")}</span>
+                </div>
+            </div>
+            {editable ? (
+                <>
+                    <Stepper label={t("weight")} value={entry.weight} unit="" step={1} display={`x${entry.weight}`} onChange={(v) => actions.setItemWeight(index, v)} />
+                    <Stepper
+                        label={t("maxCount")}
+                        value={entry.max}
+                        unit=""
+                        step={1}
+                        display={entry.max > 0 ? `${entry.max}` : t("noLimit")}
+                        onChange={(v) => actions.setItemMax(index, v)}
+                    />
+                    <span className={styles.note}>{t("weightHint")}</span>
+                </>
+            ) : (
+                <span className={styles.note}>{t("clickToEdit")}</span>
+            )}
+        </div>
+    );
+}
+
 /** One use button: the game's zoning icon, the name and how many buildings it gives. */
 function UseTile({ label, icon, count, on, onClick }: { label: string; icon: string; count: number; on: boolean; onClick: () => void }) {
     return (

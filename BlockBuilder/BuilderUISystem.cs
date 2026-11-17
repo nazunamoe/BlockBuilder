@@ -429,6 +429,11 @@ namespace BlockBuilder
             AddBinding(new TriggerBinding<string>(kGroup, "renameList", RenameList));
             AddBinding(new TriggerBinding(kGroup, "deleteList", DeleteList));
             AddBinding(new TriggerBinding<int>(kGroup, "removeItem", RemoveItem));
+            // Per building: how often it is picked (weight 1..10) and at most how many (0 = no limit).
+            AddBinding(new TriggerBinding<int, int>(kGroup, "setItemWeight", (index, weight) =>
+                EditEntry(index, e => e.Weight = System.Math.Max(1, System.Math.Min(kMaxWeight, weight)))));
+            AddBinding(new TriggerBinding<int, int>(kGroup, "setItemMax", (index, max) =>
+                EditEntry(index, e => e.MaxCount = System.Math.Max(0, System.Math.Min(kMaxPerItem, max)))));
             AddBinding(new TriggerBinding(kGroup, "clearItems", () =>
             {
                 var options = Mod.Options;
@@ -679,6 +684,24 @@ namespace BlockBuilder
             palette.Entries.RemoveAt(index);
             PaletteStore.Update(options.ActivePalette);
             // Same as adding: a removal must replan, or Build applies a cached plan that still has it.
+            Edit(o => { });
+        }
+
+        private const int kMaxWeight = 10;
+        private const int kMaxPerItem = 99;
+
+        /// <summary>Changes one entry of the current list, saves it and replans.</summary>
+        private static void EditEntry(int index, System.Action<Core.PaletteEntry> change)
+        {
+            var options = Mod.Options;
+            var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
+            if (palette == null || index < 0 || index >= palette.Entries.Count)
+            {
+                return;
+            }
+
+            change(palette.Entries[index]);
+            PaletteStore.Update(options.ActivePalette);
             Edit(o => { });
         }
 
@@ -1016,6 +1039,8 @@ namespace BlockBuilder
                     Prop(sb, "label", PrefabNames.Of(entry.Prefab));
                     Prop(sb, "size", building != null ? $"{building.LotWidth}x{building.LotDepth}" : "?");
                     Prop(sb, "thumb", Thumb(building));
+                    Prop(sb, "weight", (int)System.Math.Round(entry.Weight));
+                    Prop(sb, "max", entry.MaxCount);
                     Prop(sb, "loaded", building != null || !m_Catalog.Ready);
                     Prop(sb, "checked", o.Checked.Contains(entry.Prefab), last: true);
                     sb.Append('}');

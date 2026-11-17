@@ -26,6 +26,8 @@ namespace BlockBuilder.Core
             public Random Rng;
             /// <summary>Items placed last, newest at the end; sized orders avoid repeating them.</summary>
             public readonly List<string> Recent = new List<string>();
+            /// <summary>Copies per item in <see cref="Recent"/> (rounded weight, at least 1).</summary>
+            public readonly Dictionary<string, int> Weights = new Dictionary<string, int>(StringComparer.Ordinal);
             /// <summary>Lots and buildings: may be overlapped by the overlap allowances.</summary>
             public readonly List<Obb> Obstacles = new List<Obb>();
             /// <summary>Roads: never overlapped.</summary>
@@ -71,6 +73,11 @@ namespace BlockBuilder.Core
             }
 
             var items = request.Items.Where(i => i != null && i.Width > 0 && i.Depth > 0 && i.Weight > 0).ToList();
+            foreach (var i in items)
+            {
+                ctx.Weights[i.Id] = (int)Math.Max(1, Math.Min(kRecentKept, Math.Round(i.Weight)));
+            }
+
             var roadItems = items.Where(i => i.RequiresRoad).ToList();
             var interiorItems = items.Where(i => !i.RequiresRoad).ToList();
 
@@ -180,6 +187,37 @@ namespace BlockBuilder.Core
         }
 
         private const int kRecentKept = 12;
+
+        /// <summary>
+        /// Copies of an item in the "recently used" window: weight w (rounded, at least 1) gives w
+        /// copies, so the no-repeat rotation uses a weight-3 item three times as often.
+        /// Returns -1 with <paramref name="copy"/> = a copy not in the window, or the window index of
+        /// the oldest last use with that copy.
+        /// </summary>
+        private static int OldestCopy(Context ctx, string id, out string copy)
+        {
+            int copies = ctx.Weights.TryGetValue(id, out int w) ? w : 1;
+            int oldest = int.MaxValue;
+            copy = id;
+            for (int k = 0; k < copies; k++)
+            {
+                string name = k == 0 ? id : id + "\u0001" + k;
+                int last = ctx.Recent.LastIndexOf(name);
+                if (last < 0)
+                {
+                    copy = name;
+                    return -1;
+                }
+
+                if (last < oldest)
+                {
+                    oldest = last;
+                    copy = name;
+                }
+            }
+
+            return oldest;
+        }
 
         /// <summary>
         /// Unused frontage left at the end of a run of a given length when it is filled with the
@@ -311,7 +349,8 @@ namespace BlockBuilder.Core
         {
             ctx.Counts.TryGetValue(id, out int n);
             ctx.Counts[id] = n + 1;
-            ctx.Recent.Add(id);
+            OldestCopy(ctx, id, out string copy);
+            ctx.Recent.Add(copy);
             if (ctx.Recent.Count > kRecentKept)
             {
                 ctx.Recent.RemoveAt(0);
@@ -389,17 +428,20 @@ namespace BlockBuilder.Core
             var key = ctx.Options.SizeBy;
             bool large = ctx.Options.Order == SizeOrder.LargeFirst;
             int seed = ctx.Options.Seed;
+            // A weight-w item takes part as w copies (see Count): it is fresh while one of its copies
+            // is not among the recent lots, and when all are, its oldest copy decides its place.
+            // With every weight 1 this is the plain "not used recently" rule.
             var ordered = (large ? candidates.OrderByDescending(c => SizeOf(c, key)) : candidates.OrderBy(c => SizeOf(c, key)))
                 .ThenBy(c => StableHash(c.Id, seed))
                 .ThenBy(c => c.Id, StringComparer.Ordinal)
                 .ToList();
             // The newest uses weigh most: an item used just now goes behind one used a while ago.
-            foreach (var c in ordered.Where(c => !ctx.Recent.Contains(c.Id)))
+            foreach (var c in ordered.Where(c => OldestCopy(ctx, c.Id, out _) < 0))
             {
                 yield return c;
             }
 
-            foreach (var c in ordered.Where(c => ctx.Recent.Contains(c.Id)).OrderBy(c => ctx.Recent.LastIndexOf(c.Id)))
+            foreach (var c in ordered.Where(c => OldestCopy(ctx, c.Id, out _) >= 0).OrderBy(c => OldestCopy(ctx, c.Id, out _)))
             {
                 yield return c;
             }

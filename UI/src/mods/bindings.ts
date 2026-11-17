@@ -56,6 +56,10 @@ export interface EntryInfo {
     thumb: string;
     loaded: boolean;
     checked: boolean;
+    /** How often it is picked, 1..10. */
+    weight: number;
+    /** At most this many per build; 0 = no limit. */
+    max: number;
 }
 
 export interface Lists {
@@ -238,6 +242,8 @@ export const actions = {
     addResults: () => trigger(GROUP, "addResults"),
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
     setSearchGroup: (g: string) => trigger(GROUP, "setSearchGroup", g),
+    setItemWeight: (index: number, weight: number) => trigger(GROUP, "setItemWeight", index, weight),
+    setItemMax: (index: number, max: number) => trigger(GROUP, "setItemMax", index, max),
     setSearchCategory: (c: number) => trigger(GROUP, "setSearchCategory", c),
     setSearchTheme: (s: string) => trigger(GROUP, "setSearchTheme", s),
     setSearchWidth: (n: number) => trigger(GROUP, "setSearchWidth", n),

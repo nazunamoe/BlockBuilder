@@ -1307,3 +1307,58 @@ $radius: 6rem;
 .tileRemove .removeGlyph {
     background-color: white;
 }
+
+// ---- Per-building weight and limit ----
+
+.tileSelected {
+    border-color: $warn;
+
+    &:hover {
+        border-color: $warn;
+    }
+}
+
+.itemRowSelected {
+    border-left-color: $warn;
+    background-color: $surface-hover;
+}
+
+.tileCheck.tileCheckOff {
+    background-color: rgba(0, 0, 0, 0.55);
+    border: 2rem solid rgba(255, 255, 255, 0.7);
+}
+
+.tileCheck {
+    padding: 0;
+    border: none;
+    cursor: pointer;
+}
+
+.mixBadge {
+    color: $warn;
+}
+
+.tileMix {
+    position: absolute;
+    right: 3rem;
+    bottom: 3rem;
+    padding: 1rem 5rem;
+    font-size: 10rem;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 8rem;
+}
+
+.detailCard {
+    width: 100%;
+    margin-top: 6rem;
+    padding: 6rem 10rem 8rem 10rem;
+    background-color: $surface;
+    border-radius: $radius;
+}
+
+.detailTop {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4rem;
+}
