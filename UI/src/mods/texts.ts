@@ -58,6 +58,7 @@ export const T: { [key: string]: [string, string] } = {
     anyCategory: ["All", "전체"],
     use: ["Use", "용도"],
     allOf: ["All", "전체"],
+    view: ["View", "보기"],
     viewGrid: ["Pictures", "큰 그림"],
     viewList: ["List", "목록"],
     theme: ["Theme", "테마"],

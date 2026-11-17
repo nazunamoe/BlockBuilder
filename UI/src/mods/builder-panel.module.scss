@@ -1269,3 +1269,41 @@ $radius: 6rem;
     color: $muted;
     font-size: 10rem;
 }
+
+// List view in the normal-width panel: three smaller tiles a row.
+.tileSmall {
+    width: 104rem;
+    margin: 0 4rem 4rem 0;
+}
+
+.tileImageSmall {
+    height: 84rem;
+}
+
+.tileSmall .tileImageWrap {
+    height: 84rem;
+}
+
+.tileRemove {
+    position: absolute;
+    top: 3rem;
+    left: 3rem;
+    width: 18rem;
+    height: 18rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: none;
+    border-radius: 9rem;
+    cursor: pointer;
+
+    &:hover {
+        background-color: $danger;
+    }
+}
+
+.tileRemove .removeGlyph {
+    background-color: white;
+}

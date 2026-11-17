@@ -214,9 +214,46 @@ function PreviewBox({ item, t }: { item: Shown | null; t: Tr }) {
     );
 }
 
+type View = "grid" | "list";
+
+/** Picture grid or list, remembered for both the list and the add view. */
+function useView(): [View, (v: View) => void] {
+    const [view, setViewState] = useState<View>(() => (loadJson(VIEW_KEY, { view: "grid" }).view === "list" ? "list" : "grid"));
+    const setView = (v: View) => {
+        setViewState(v);
+        saveJson(VIEW_KEY, { view: v });
+    };
+    return [view, setView];
+}
+
+function ViewButtons({ view, setView, t }: { view: View; setView: (v: View) => void; t: Tr }) {
+    return (
+        <>
+            <button className={`${styles.chip} ${view === "grid" ? styles.chipOn : ""}`} onClick={() => setView("grid")}>
+                {t("viewGrid")}
+            </button>
+            <button className={`${styles.chip} ${view === "list" ? styles.chipOn : ""}`} onClick={() => setView("list")}>
+                {t("viewList")}
+            </button>
+        </>
+    );
+}
+
+function ViewToggle({ view, setView, t }: { view: View; setView: (v: View) => void; t: Tr }) {
+    return (
+        <div className={styles.resultHeader}>
+            <span>{t("view")}</span>
+            <div className={styles.resultTools}>
+                <ViewButtons view={view} setView={setView} t={t} />
+            </div>
+        </div>
+    );
+}
+
 function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void }) {
     const [confirmClear, setConfirmClear] = useState(false);
     const [hover, setHover] = useState<EntryInfo | null>(null);
+    const [view, setView] = useView();
     const onlyChecked = state.scope === 1;
     const hasList = lists.palettes[state.palette] !== undefined;
 
@@ -274,8 +311,48 @@ function ListContents({ state, lists, t, onAdd }: { state: BuilderState; lists: 
                 </div>
             )}
 
+            {lists.entries.length > 0 && <ViewToggle view={view} setView={setView} t={t} />}
+
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
+            ) : view === "grid" ? (
+                <>
+                    <Scrollable className={styles.gridList} vertical>
+                        <div className={styles.grid}>
+                            {lists.entries.map((e, i) => (
+                                <div
+                                    key={i}
+                                    className={`${styles.tile} ${styles.tileSmall} ${onlyChecked && e.checked ? styles.tileOn : ""} ${e.loaded ? "" : styles.dim}`}
+                                    onMouseEnter={() => setHover(e)}
+                                    onMouseLeave={() => setHover(null)}
+                                    onClick={() => onlyChecked && actions.toggleChecked(i)}
+                                >
+                                    <div className={styles.tileImageWrap}>
+                                        <Thumb src={e.thumb} className={`${styles.tileImage} ${styles.tileImageSmall}`} />
+                                        <span className={styles.tileSize}>{e.loaded ? e.size : t("notLoaded")}</span>
+                                        {onlyChecked && e.checked && (
+                                            <span className={styles.tileCheck}>
+                                                <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />
+                                            </span>
+                                        )}
+                                        <button
+                                            className={styles.tileRemove}
+                                            title={t("removeFromList")}
+                                            onClick={(ev) => {
+                                                ev.stopPropagation();
+                                                actions.removeItem(i);
+                                            }}
+                                        >
+                                            <Glyph className={styles.removeGlyph} src="Media/Glyphs/Close.svg" />
+                                        </button>
+                                    </div>
+                                    <span className={styles.tileName}>{e.label || e.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </Scrollable>
+                    <PreviewBox item={hover} t={t} />
+                </>
             ) : (
                 <>
                 <Scrollable className={styles.itemList} vertical>
@@ -324,11 +401,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
     const tooMany = search.total > search.maxAddAll;
     const current = lists.palettes[state.palette];
     const openGroup = search.groups.find((g) => g.id === search.group);
-    const [view, setViewState] = useState<string>(() => (loadJson(VIEW_KEY, { view: "grid" }).view === "list" ? "list" : "grid"));
-    const setView = (v: string) => {
-        setViewState(v);
-        saveJson(VIEW_KEY, { view: v });
-    };
+    const [view, setView] = useView();
 
     return (
         <>
@@ -397,12 +470,7 @@ function AddBuildings({ search, lists, state, t, onBack }: { search: Search; lis
                     {search.total > search.results.length ? ` · ${t("showingFirst")}` : ""}
                 </span>
                 <div className={styles.resultTools}>
-                    <button className={`${styles.chip} ${view === "grid" ? styles.chipOn : ""}`} onClick={() => setView("grid")}>
-                        {t("viewGrid")}
-                    </button>
-                    <button className={`${styles.chip} ${view === "list" ? styles.chipOn : ""}`} onClick={() => setView("list")}>
-                        {t("viewList")}
-                    </button>
+                    <ViewButtons view={view} setView={setView} t={t} />
                     <button className={`${styles.chip} ${styles.chipPrimary}`} disabled={search.total === 0 || tooMany || !current} onClick={actions.addResults}>
                         {tooMany ? `${t("addAllTooMany")} ${search.maxAddAll}` : `${t("addAll")} (${search.total})`}
                     </button>
