@@ -184,6 +184,49 @@ export const Stepper = ({
  * Lot size filter row like Find It: a comparison (< = >) and a cell count; 0 means any size.
  * One cell is 8 m, shown next to the count.
  */
+/** Smallest and largest lot in cells (0 = no limit), two steppers under the axis name. */
+export const RangeFilter = ({
+    label,
+    min,
+    max,
+    minLabel,
+    maxLabel,
+    anyLabel,
+    onMin,
+    onMax,
+}: {
+    label: string;
+    min: number;
+    max: number;
+    minLabel: string;
+    maxLabel: string;
+    anyLabel: string;
+    onMin: (v: number) => void;
+    onMax: (v: number) => void;
+}) => {
+    const part = (name: string, value: number, onValue: (v: number) => void) => (
+        <div className={styles.rangePart}>
+            <span className={styles.rangeName}>{name}</span>
+            <button className={styles.stepButton} onClick={() => onValue(Math.max(0, value - 1))}>
+                -
+            </button>
+            <span className={styles.rangeValue}>{value === 0 ? anyLabel : value}</span>
+            <button className={styles.stepButton} onClick={() => onValue(value + 1)}>
+                +
+            </button>
+        </div>
+    );
+    return (
+        <div className={styles.rangeBlock}>
+            <span className={styles.rangeTitle}>{label}</span>
+            <div className={styles.rangeRow}>
+                {part(minLabel, min, onMin)}
+                {part(maxLabel, max, onMax)}
+            </div>
+        </div>
+    );
+};
+
 export const SizeFilter = ({
     label,
     value,

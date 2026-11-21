@@ -508,10 +508,13 @@ namespace BlockBuilder
             }));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchTheme", s => { m_SearchTheme = s ?? string.Empty; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchLevel", n => { m_SearchLevel = System.Math.Max(0, System.Math.Min(5, n)); m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidth", n => { m_SearchWidth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchWidthOp", n => { m_SearchWidthOp = ToCompare(n); m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchDepth", n => { m_SearchDepth = System.Math.Max(0, System.Math.Min(16, n)); m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<int>(kGroup, "setSearchDepthOp", n => { m_SearchDepthOp = ToCompare(n); m_SearchKey = null; }));
+            // Smallest and largest lot (cells, 0 = no limit); one never passes the other.
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMinWidth", n => { m_MinWidth = ClampCells(n); if (m_MaxWidth > 0 && m_MinWidth > m_MaxWidth) { m_MaxWidth = m_MinWidth; } m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMaxWidth", n => { m_MaxWidth = ClampCells(n); if (m_MaxWidth > 0 && m_MinWidth > m_MaxWidth) { m_MinWidth = m_MaxWidth; } m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMinDepth", n => { m_MinDepth = ClampCells(n); if (m_MaxDepth > 0 && m_MinDepth > m_MaxDepth) { m_MaxDepth = m_MinDepth; } m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchMaxDepth", n => { m_MaxDepth = ClampCells(n); if (m_MaxDepth > 0 && m_MinDepth > m_MaxDepth) { m_MinDepth = m_MaxDepth; } m_SearchKey = null; }));
+            // 0 = all buildings, 1 = base game only, 2 = mod / asset-pack buildings only.
+            AddBinding(new TriggerBinding<int>(kGroup, "setSearchSource", n => { m_SearchSource = System.Math.Max(0, System.Math.Min(2, n)); m_SearchKey = null; }));
         }
 
         // ---- List (preset) management ----
@@ -618,12 +621,14 @@ namespace BlockBuilder
             },
         };
         // Lot size filter in cells (0 = any), each with its own < / = / > comparison.
-        private int m_SearchWidth;
-        private int m_SearchDepth;
-        private Core.SizeCompare m_SearchWidthOp = Core.SizeCompare.Equal;
-        private Core.SizeCompare m_SearchDepthOp = Core.SizeCompare.Equal;
+        private int m_MinWidth;
+        private int m_MaxWidth;
+        private int m_MinDepth;
+        private int m_MaxDepth;
+        private int m_SearchSource;
 
-        private static Core.SizeCompare ToCompare(int n) => n == 0 ? Core.SizeCompare.Less : n == 2 ? Core.SizeCompare.Greater : Core.SizeCompare.Equal;
+        private static int ClampCells(int n) => System.Math.Max(0, System.Math.Min(16, n));
+
         private string m_SearchKey;
 
         private static void Select(string path)
@@ -855,8 +860,11 @@ namespace BlockBuilder
                 filter.Themes.Add(m_SearchTheme);
             }
 
-            filter.SetWidth(m_SearchWidthOp, m_SearchWidth);
-            filter.SetDepth(m_SearchDepthOp, m_SearchDepth);
+            filter.MinWidth = m_MinWidth;
+            filter.MaxWidth = m_MaxWidth > 0 ? m_MaxWidth : int.MaxValue;
+            filter.MinDepth = m_MinDepth;
+            filter.MaxDepth = m_MaxDepth > 0 ? m_MaxDepth : int.MaxValue;
+            filter.Source = (Core.SourceFilter)m_SearchSource;
 
             return m_Catalog.Buildings
                 .Where(b => filter.Matches(b.Item) && (m_SearchLevel == 0 || (b.Kind & EntryKind.Growable) != 0 && b.Level == m_SearchLevel))
@@ -881,10 +889,11 @@ namespace BlockBuilder
             Prop(sb, "removable", all.Count(b => inList.Contains(b.Name)));
             Prop(sb, "level", m_SearchLevel);
             Prop(sb, "theme", m_SearchTheme);
-            Prop(sb, "width", m_SearchWidth);
-            Prop(sb, "widthOp", (int)m_SearchWidthOp);
-            Prop(sb, "depth", m_SearchDepth);
-            Prop(sb, "depthOp", (int)m_SearchDepthOp);
+            Prop(sb, "minWidth", m_MinWidth);
+            Prop(sb, "maxWidth", m_MaxWidth);
+            Prop(sb, "minDepth", m_MinDepth);
+            Prop(sb, "maxDepth", m_MaxDepth);
+            Prop(sb, "source", m_SearchSource);
             Prop(sb, "text", m_SearchText);
             Prop(sb, "maxAddAll", kMaxAddAll);
             sb.Append("\"results\":[");
@@ -1008,7 +1017,7 @@ namespace BlockBuilder
             // The catalog search runs only while the builder is open and only when something changed.
             if (m_Tool.IsActive)
             {
-                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchLevel}|{m_SearchTheme}|{m_SearchWidth}{m_SearchWidthOp}|{m_SearchDepth}{m_SearchDepthOp}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}|{options.FavoriteItems}|{options.RecentItems}";
+                string searchKey = $"{m_SearchText}|{m_SearchGroup}|{m_SearchCategory}|{m_SearchLevel}|{m_SearchTheme}|{m_MinWidth}-{m_MaxWidth}|{m_MinDepth}-{m_MaxDepth}|{m_SearchSource}|{PaletteStore.Version}|{options.ActivePalette}|{m_Catalog.Ready}|{m_Catalog.NamesLocale}|{options.FavoriteItems}|{options.RecentItems}";
                 if (searchKey != m_SearchKey)
                 {
                     m_SearchKey = searchKey;

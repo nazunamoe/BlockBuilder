@@ -4,7 +4,7 @@ import { Scrollable } from "cs2/ui";
 import { useEffect, useRef, useState } from "react";
 import { actions, BuilderState, DENSITY, EntryInfo, Lists, listsBinding, parseLists, parseSearch, parseState, Search, searchBinding, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
 import { T } from "mods/texts";
-import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, SizeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
+import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, RangeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
 import styles from "./builder-panel.module.scss";
 
 /** The game's own tool options toolbar (snapping buttons), shown inside the builder panel. */
@@ -25,6 +25,7 @@ const TABS_REM = 40;
 const POS_KEY = "blockBuilder.panelPos";
 const TAB_KEY = "blockBuilder.tab";
 const VIEW_KEY = "blockBuilder.addView";
+const SIZE_KEY = "blockBuilder.listSize";
 const DEFAULT_POS = { x: 12, y: 120 };
 
 type Tr = (k: string) => string;
@@ -227,7 +228,7 @@ function ListPicker({ state, lists, t }: { state: BuilderState; lists: Lists; t:
                     {prompt === "delete" && current && (
                         <div className={styles.prompt}>
                             <div className={styles.promptLabel}>
-                                {t("confirmDelete")} <b>{current.name}</b>
+                                {`${t("confirmDelete")} ${current.name}`}
                             </div>
                             <div className={styles.promptRow}>
                                 <button className={`${styles.chip} ${styles.chipDanger}`} onClick={() => (actions.deleteList(), close())}>
@@ -298,7 +299,7 @@ function ViewButtons({ view, setView, t }: { view: View; setView: (v: View) => v
     );
 }
 
-function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void; gridMax: number }) {
+function ListContents({ state, lists, t, onAdd, gridMax, rem }: { state: BuilderState; lists: Lists; t: Tr; onAdd: () => void; gridMax: number; rem: number }) {
     const [confirmClear, setConfirmClear] = useState(false);
     // Hover previews a building; a click selects it for the weight and limit card below.
     const [hover, setHover] = useState<number | null>(null);
@@ -309,6 +310,41 @@ function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState
     const shownIndex = hover !== null && hover < lists.entries.length ? hover : selected;
     const shown = shownIndex !== null ? lists.entries[shownIndex] : null;
     const hasList = lists.palettes[state.palette] !== undefined;
+
+    // Show only the buildings of one lot size (view only: indices stay those of the whole list).
+    const [range, setRangeState] = useState(() => {
+        const v = loadJson(SIZE_KEY, { minW: 0, maxW: 0, minD: 0, maxD: 0 });
+        return { minW: v.minW | 0, maxW: v.maxW | 0, minD: v.minD | 0, maxD: v.maxD | 0 };
+    });
+    const [sizeOpen, setSizeOpen] = useState(range.minW + range.maxW + range.minD + range.maxD > 0);
+    const setRange = (patch: Partial<typeof range>) => {
+        const next = { ...range, ...patch };
+        // The smallest never passes the largest: the other end follows.
+        if (next.maxW > 0 && next.minW > next.maxW) {
+            patch.minW !== undefined ? (next.maxW = next.minW) : (next.minW = next.maxW);
+        }
+        if (next.maxD > 0 && next.minD > next.maxD) {
+            patch.minD !== undefined ? (next.maxD = next.minD) : (next.minD = next.maxD);
+        }
+        setRangeState(next);
+        saveJson(SIZE_KEY, next);
+    };
+    const limited = range.minW + range.maxW + range.minD + range.maxD > 0;
+    const visible = lists.entries
+        .map((e, i) => ({ e, i }))
+        .filter(({ e }) => {
+            if (!limited) {
+                return true;
+            }
+            const m = /^(\d+)x(\d+)$/.exec(e.size);
+            if (!m) {
+                return false; // not loaded: size unknown
+            }
+            const w = parseInt(m[1], 10);
+            const d = parseInt(m[2], 10);
+            return w >= range.minW && (range.maxW === 0 || w <= range.maxW) && d >= range.minD && (range.maxD === 0 || d <= range.maxD);
+        });
+    const listHeight = Math.max(100, gridMax - (sizeOpen ? 56 * rem : 0));
 
     return (
         <>
@@ -340,14 +376,32 @@ function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState
                         </button>
                     </>
                 )}
+                <button className={`${styles.chip} ${limited ? styles.chipOn : ""}`} onClick={() => setSizeOpen(!sizeOpen)}>
+                    {t("sizeFilter")}
+                    {limited ? ` (${visible.length}/${lists.entries.length})` : ""}
+                </button>
                 <span className={styles.toolbarSpacer} />
                 <ViewButtons view={view} setView={setView} t={t} />
             </div>
 
+            {sizeOpen && (
+                <div className={styles.sizeBar}>
+                    <div className={styles.sizeBarPart}>
+                        <RangeFilter label={t("lotWidth")} min={range.minW} max={range.maxW} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minW: v })} onMax={(v) => setRange({ maxW: v })} />
+                    </div>
+                    <div className={styles.sizeBarPart}>
+                        <RangeFilter label={t("lotDepth")} min={range.minD} max={range.maxD} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minD: v })} onMax={(v) => setRange({ maxD: v })} />
+                    </div>
+                    <button className={styles.chip} disabled={!limited} onClick={() => setRange({ minW: 0, maxW: 0, minD: 0, maxD: 0 })}>
+                        {t("sizeReset")}
+                    </button>
+                </div>
+            )}
+
             {confirmClear && lists.entries.length > 0 && (
                 <div className={styles.prompt}>
                     <div className={styles.promptLabel}>
-                        {t("confirmClearItems")} <b>{lists.palettes[state.palette]?.name}</b> ({lists.entries.length})
+                        {`${t("confirmClearItems")} ${lists.palettes[state.palette]?.name ?? ""} (${lists.entries.length})`}
                     </div>
                     <div className={styles.promptRow}>
                         <button
@@ -368,13 +422,15 @@ function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState
 
             {lists.entries.length === 0 ? (
                 <div className={styles.empty}>{hasList ? t("itemsEmpty") : t("noListSelected")}</div>
+            ) : visible.length === 0 ? (
+                <div className={styles.empty}>{t("sizeNone")}</div>
             ) : (
                 <div className={styles.listPanes}>
                     <div className={styles.listGrid}>
             {view === "grid" ? (
-                <Scrollable className={styles.gridList} style={{ height: `${gridMax}px`, maxHeight: "none" }} vertical>
+                <Scrollable className={styles.gridList} style={{ height: `${listHeight}px`, maxHeight: "none" }} vertical>
                     <div className={styles.grid}>
-                        {lists.entries.map((e, i) => (
+                        {visible.map(({ e, i }) => (
                             <div
                                 key={i}
                                 className={`${styles.tile} ${styles.tileSmall} ${selected === i ? styles.tileSelected : ""} ${onlyChecked && e.checked ? styles.tileOn : ""} ${e.loaded ? "" : styles.dim}`}
@@ -414,8 +470,8 @@ function ListContents({ state, lists, t, onAdd, gridMax }: { state: BuilderState
                     </div>
                 </Scrollable>
             ) : (
-                <Scrollable className={styles.itemList} style={{ height: `${gridMax}px`, maxHeight: "none" }} vertical>
-                    {lists.entries.map((e, i) => (
+                <Scrollable className={styles.itemList} style={{ height: `${listHeight}px`, maxHeight: "none" }} vertical>
+                    {visible.map(({ e, i }) => (
                         <div
                             key={i}
                             className={`${styles.itemRow} ${selected === i ? styles.itemRowSelected : ""} ${e.loaded ? "" : styles.dim}`}
@@ -634,9 +690,18 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                 {search.level > 0 && <span className={styles.note}>{t("levelHint")}</span>}
             </div>
 
+            <div className={styles.chipWrap}>
+                <span className={styles.fieldLabelInline}>{t("source")}</span>
+                {[t("srcAll"), t("srcVanilla"), t("srcMods")].map((label, i) => (
+                    <button key={i} className={`${styles.chip} ${search.source === i ? styles.chipOn : ""}`} onClick={() => actions.setSearchSource(i)}>
+                        {label}
+                    </button>
+                ))}
+            </div>
+
             <div className={styles.fieldLabel}>{t("lotSize")}</div>
-            <SizeFilter label={t("lotWidth")} value={search.width} op={search.widthOp} anyLabel={t("anySize")} onValue={actions.setSearchWidth} onOp={actions.setSearchWidthOp} />
-            <SizeFilter label={t("lotDepth")} value={search.depth} op={search.depthOp} anyLabel={t("anySize")} onValue={actions.setSearchDepth} onOp={actions.setSearchDepthOp} />
+            <RangeFilter label={t("lotWidth")} min={search.minWidth} max={search.maxWidth} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={actions.setSearchMinWidth} onMax={actions.setSearchMaxWidth} />
+            <RangeFilter label={t("lotDepth")} min={search.minDepth} max={search.maxDepth} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={actions.setSearchMinDepth} onMax={actions.setSearchMaxDepth} />
             </Scrollable>
             </div>
 
@@ -659,7 +724,7 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
             {confirmRemove && search.removable > 0 && (
                 <div className={styles.prompt}>
                     <div className={styles.promptLabel}>
-                        {t("confirmRemoveAll")} <b>{current?.name}</b> ({search.removable})
+                        {`${t("confirmRemoveAll")} ${current?.name ?? ""} (${search.removable})`}
                     </div>
                     <div className={styles.promptRow}>
                         <button
@@ -1013,7 +1078,7 @@ export const BuilderPanel = () => {
                             {tab === "buildings" && (
                                 <>
                                     <ListPicker state={state} lists={lists} t={t} />
-                                    <ListContents state={state} lists={lists} t={t} onAdd={() => setAdding(true)} gridMax={gridMax} />
+                                    <ListContents state={state} lists={lists} t={t} onAdd={() => setAdding(true)} gridMax={gridMax} rem={rem} />
                                 </>
                             )}
                             {tab === "settings" && <PlacementSettings state={state} lists={lists} t={t} />}

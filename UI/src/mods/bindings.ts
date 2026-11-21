@@ -131,10 +131,13 @@ export interface Search {
     removable: number;
     groups: UseGroup[];
     theme: string;
-    width: number;
-    widthOp: number;
-    depth: number;
-    depthOp: number;
+    /** Smallest and largest lot in cells, 0 = no limit. */
+    minWidth: number;
+    maxWidth: number;
+    minDepth: number;
+    maxDepth: number;
+    /** 0 = all, 1 = base game, 2 = mods and asset packs. */
+    source: number;
     text: string;
     maxAddAll: number;
     results: SearchResult[];
@@ -146,7 +149,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, inListCount: 0, removable: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
+const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, inListCount: 0, removable: 0, level: 0, groups: [], theme: "", minWidth: 0, maxWidth: 0, minDepth: 0, maxDepth: 0, source: 0, text: "", maxAddAll: 300, results: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {
@@ -267,10 +270,11 @@ export const actions = {
     setItemMax: (index: number, max: number) => trigger(GROUP, "setItemMax", index, max),
     setSearchCategory: (c: number) => trigger(GROUP, "setSearchCategory", c),
     setSearchTheme: (s: string) => trigger(GROUP, "setSearchTheme", s),
-    setSearchWidth: (n: number) => trigger(GROUP, "setSearchWidth", n),
-    setSearchWidthOp: (op: number) => trigger(GROUP, "setSearchWidthOp", op),
-    setSearchDepth: (n: number) => trigger(GROUP, "setSearchDepth", n),
-    setSearchDepthOp: (op: number) => trigger(GROUP, "setSearchDepthOp", op),
+    setSearchMinWidth: (n: number) => trigger(GROUP, "setSearchMinWidth", n),
+    setSearchMaxWidth: (n: number) => trigger(GROUP, "setSearchMaxWidth", n),
+    setSearchMinDepth: (n: number) => trigger(GROUP, "setSearchMinDepth", n),
+    setSearchMaxDepth: (n: number) => trigger(GROUP, "setSearchMaxDepth", n),
+    setSearchSource: (n: number) => trigger(GROUP, "setSearchSource", n),
     setGenerateRoads: (b: boolean) => trigger(GROUP, "setGenerateRoads", b),
     setSizeOrder: (n: number) => trigger(GROUP, "setSizeOrder", n),
     setSizeKey: (n: number) => trigger(GROUP, "setSizeKey", n),
