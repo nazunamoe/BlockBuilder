@@ -127,6 +127,8 @@ export interface Search {
     recentCount: number;
     /** Matches that are in the current list. */
     inListCount: number;
+    /** Matches (all of them, not just the shown ones) that are in the current list. */
+    removable: number;
     groups: UseGroup[];
     theme: string;
     width: number;
@@ -144,7 +146,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, inListCount: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
+const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, inListCount: 0, removable: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {
@@ -256,6 +258,7 @@ export const actions = {
     clearItems: () => trigger(GROUP, "clearItems"),
     addItem: (name: string) => trigger(GROUP, "addItem", name),
     addResults: () => trigger(GROUP, "addResults"),
+    removeResults: () => trigger(GROUP, "removeResults"),
     setSearchText: (s: string) => trigger(GROUP, "setSearchText", s),
     setSearchLevel: (n: number) => trigger(GROUP, "setSearchLevel", n),
     setSearchGroup: (g: string) => trigger(GROUP, "setSearchGroup", g),

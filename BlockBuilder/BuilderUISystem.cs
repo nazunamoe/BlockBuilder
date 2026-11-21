@@ -468,6 +468,23 @@ namespace BlockBuilder
                     Mod.Options.ApplyAndSave();
                 }
             }));
+            // Takes every building the current filters match out of the list (the opposite of addResults).
+            AddBinding(new TriggerBinding(kGroup, "removeResults", () =>
+            {
+                var options = Mod.Options;
+                var palette = options == null ? null : PaletteStore.Get(options.ActivePalette);
+                if (palette == null)
+                {
+                    return;
+                }
+
+                var names = new HashSet<string>(Search().Select(b => b.Name));
+                if (palette.Entries.RemoveAll(e => names.Contains(e.Prefab)) > 0)
+                {
+                    PaletteStore.Update(options.ActivePalette);
+                    Edit(o => { });
+                }
+            }));
             AddBinding(new TriggerBinding(kGroup, "addResults", () =>
             {
                 // Guard against adding the whole catalog with one click.
@@ -861,6 +878,7 @@ namespace BlockBuilder
             Prop(sb, "favoriteCount", m_FavoriteCount);
             Prop(sb, "recentCount", m_RecentCount);
             Prop(sb, "inListCount", m_InListCount);
+            Prop(sb, "removable", all.Count(b => inList.Contains(b.Name)));
             Prop(sb, "level", m_SearchLevel);
             Prop(sb, "theme", m_SearchTheme);
             Prop(sb, "width", m_SearchWidth);

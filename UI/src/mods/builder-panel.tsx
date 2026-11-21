@@ -546,6 +546,7 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
     const current = lists.palettes[state.palette];
     const openGroup = search.groups.find((g) => g.id === search.group);
     const [view, setView] = useView();
+    const [confirmRemove, setConfirmRemove] = useState(false);
 
     return (
         <div className={styles.addLayout}>
@@ -650,10 +651,34 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                     <button className={`${styles.chip} ${styles.chipPrimary}`} disabled={search.total === 0 || tooMany || !current} onClick={actions.addResults}>
                         {tooMany ? `${t("addAllTooMany")} ${search.maxAddAll}` : `${t("addAll")} (${search.total})`}
                     </button>
+                    <button className={`${styles.chip} ${styles.chipDangerText}`} disabled={search.removable === 0} onClick={() => setConfirmRemove(true)}>
+                        {t("removeAll")} ({search.removable})
+                    </button>
                 </div>
             </div>
+            {confirmRemove && search.removable > 0 && (
+                <div className={styles.prompt}>
+                    <div className={styles.promptLabel}>
+                        {t("confirmRemoveAll")} <b>{current?.name}</b> ({search.removable})
+                    </div>
+                    <div className={styles.promptRow}>
+                        <button
+                            className={`${styles.chip} ${styles.chipDanger}`}
+                            onClick={() => {
+                                actions.removeResults();
+                                setConfirmRemove(false);
+                            }}
+                        >
+                            {t("removeAll")}
+                        </button>
+                        <button className={styles.chip} onClick={() => setConfirmRemove(false)}>
+                            {t("cancel")}
+                        </button>
+                    </div>
+                </div>
+            )}
 
-            {search.group === "inlist" && <span className={styles.note}>{t("removeHint")}</span>}
+            {search.results.some((r) => r.inList) && <span className={styles.note}>{t("removeHint")}</span>}
             {search.results.length === 0 ? (
                 <div className={styles.empty} style={{ height: `${Math.max(120, paneMax - 168 * rem)}px` }}>{t("noResults")}</div>
             ) : view === "grid" ? (
@@ -673,9 +698,16 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                                     {r.lv > 0 && <span className={styles.tileLevel}>Lv{r.lv}</span>}
                                     <Star on={r.fav} className={styles.tileStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
                                     {r.inList && (
-                                        <span className={`${styles.tileCheck} ${search.group === "inlist" ? styles.tileCheckRemove : ""}`}>
-                                            <Glyph className={styles.tileCheckGlyph} src={search.group === "inlist" ? "Media/Glyphs/Close.svg" : "Media/Glyphs/Checkmark.svg"} />
-                                        </span>
+                                        <button
+                                            className={`${styles.tileCheck} ${styles.tileCheckRemove}`}
+                                            title={t("removeFromList")}
+                                            onClick={(ev) => {
+                                                ev.stopPropagation();
+                                                actions.removeItemByName(r.name);
+                                            }}
+                                        >
+                                            <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Close.svg" />
+                                        </button>
                                     )}
                                 </div>
                                 <span className={styles.tileName}>{r.label || r.name}</span>
