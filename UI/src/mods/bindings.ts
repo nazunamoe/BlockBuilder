@@ -240,6 +240,8 @@ export const actions = {
     setFillRest: (b: boolean) => trigger(GROUP, "setFillRest", b),
     toggleChecked: (i: number) => trigger(GROUP, "toggleChecked", i),
     checkAll: (b: boolean) => trigger(GROUP, "checkAll", b),
+    /** mode 0 = uncheck the listed entries, 1 = check them, 2 = check exactly them. */
+    checkMany: (indices: number[], mode: number) => trigger(GROUP, "checkMany", indices.join(","), mode),
     toggleSnap: (bit: number) => trigger(GROUP, "toggleSnap", bit),
     setOverlapSide: (n: number) => trigger(GROUP, "setOverlapSide", n),
     setOverlapBack: (n: number) => trigger(GROUP, "setOverlapBack", n),

@@ -368,10 +368,19 @@ function ListContents({ state, lists, t, onAdd, gridMax, rem }: { state: Builder
                 </button>
                 {onlyChecked && (
                     <>
-                        <button className={styles.chip} onClick={() => actions.checkAll(true)}>
+                        {/* With a size filter on, "all" picks exactly the shown buildings and "none" clears only those. */}
+                        <button
+                            className={styles.chip}
+                            disabled={limited && visible.length === 0}
+                            onClick={() => (limited ? actions.checkMany(visible.map((v) => v.i), 2) : actions.checkAll(true))}
+                        >
                             {t("checkAll")}
                         </button>
-                        <button className={styles.chip} onClick={() => actions.checkAll(false)}>
+                        <button
+                            className={styles.chip}
+                            disabled={limited && visible.length === 0}
+                            onClick={() => (limited ? actions.checkMany(visible.map((v) => v.i), 0) : actions.checkAll(false))}
+                        >
                             {t("checkNone")}
                         </button>
                     </>

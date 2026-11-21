@@ -321,6 +321,32 @@ namespace BlockBuilder
                     o.SetChecked(palette.Entries.Select(e => e.Prefab), b);
                 }
             })));
+            // Check or uncheck only the listed entries (comma-separated list indices, as the filtered
+            // view shows them). Mode 0 = uncheck them, 1 = check them, 2 = check exactly them.
+            AddBinding(new TriggerBinding<string, int>(kGroup, "checkMany", (indices, mode) => Edit(o =>
+            {
+                var palette = PaletteStore.Get(o.ActivePalette);
+                if (palette == null)
+                {
+                    return;
+                }
+
+                var names = new List<string>();
+                foreach (var part in (indices ?? string.Empty).Split(','))
+                {
+                    if (int.TryParse(part, out int i) && i >= 0 && i < palette.Entries.Count)
+                    {
+                        names.Add(palette.Entries[i].Prefab);
+                    }
+                }
+
+                if (mode == 2)
+                {
+                    o.SetChecked(palette.Entries.Select(e => e.Prefab), false);
+                }
+
+                o.SetChecked(names, mode != 0);
+            })));
             AddBinding(new TriggerBinding<int>(kGroup, "toggleSnap", bit => Edit(o =>
             {
                 if ((bit & (int)BuilderTool.kSnapMask) != 0)
