@@ -125,6 +125,8 @@ export interface Search {
     /** Level filter 1..5, 0 = any. */
     level: number;
     recentCount: number;
+    /** Matches that are in the current list. */
+    inListCount: number;
     groups: UseGroup[];
     theme: string;
     width: number;
@@ -142,7 +144,7 @@ export const DENSITY = { normal: 0, relaxed: 1, dense: 2, custom: 3 };
 
 export const searchBinding = bindValue<string>(GROUP, "search", "{}");
 
-const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
+const emptySearch: Search = { total: 0, group: "", category: -1, anyCount: 0, favoriteCount: 0, recentCount: 0, inListCount: 0, level: 0, groups: [], theme: "", width: 0, widthOp: 1, depth: 0, depthOp: 1, text: "", maxAddAll: 300, results: [], themes: [] };
 
 export function parseSearch(json: string): Search {
     try {

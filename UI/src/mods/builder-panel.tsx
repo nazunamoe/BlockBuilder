@@ -567,6 +567,7 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                 {[
                     { id: "favorites", label: t("favorites"), glyph: "Media/Glyphs/StarFilled.svg", count: search.favoriteCount },
                     { id: "recent", label: t("recent"), glyph: "Media/Glyphs/ArrowCircular.svg", count: search.recentCount },
+                    { id: "inlist", label: t("inThisList"), glyph: "Media/Glyphs/Checkmark.svg", count: search.inListCount },
                 ].map((s) => (
                     <button
                         key={s.id}
@@ -652,6 +653,7 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                 </div>
             </div>
 
+            {search.group === "inlist" && <span className={styles.note}>{t("removeHint")}</span>}
             {search.results.length === 0 ? (
                 <div className={styles.empty} style={{ height: `${Math.max(120, paneMax - 168 * rem)}px` }}>{t("noResults")}</div>
             ) : view === "grid" ? (
@@ -671,8 +673,8 @@ function AddBuildings({ search, lists, state, t, onBack, paneMax, rem }: { searc
                                     {r.lv > 0 && <span className={styles.tileLevel}>Lv{r.lv}</span>}
                                     <Star on={r.fav} className={styles.tileStar} onToggle={() => actions.toggleFavorite(r.name)} t={t} />
                                     {r.inList && (
-                                        <span className={styles.tileCheck}>
-                                            <Glyph className={styles.tileCheckGlyph} src="Media/Glyphs/Checkmark.svg" />
+                                        <span className={`${styles.tileCheck} ${search.group === "inlist" ? styles.tileCheckRemove : ""}`}>
+                                            <Glyph className={styles.tileCheckGlyph} src={search.group === "inlist" ? "Media/Glyphs/Close.svg" : "Media/Glyphs/Checkmark.svg"} />
                                         </span>
                                     )}
                                 </div>

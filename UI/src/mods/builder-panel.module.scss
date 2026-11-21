@@ -1300,7 +1300,7 @@ $radius: 6rem;
     align-items: center;
     justify-content: center;
     padding: 0;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(200, 60, 45, 0.9);
     border: none;
     border-radius: 9rem;
     cursor: pointer;
@@ -1308,6 +1308,10 @@ $radius: 6rem;
     &:hover {
         background-color: $danger;
     }
+}
+
+.tileCheck.tileCheckRemove {
+    background-color: rgba(200, 60, 45, 0.9);
 }
 
 .tileRemove .removeGlyph {

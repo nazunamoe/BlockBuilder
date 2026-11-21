@@ -481,7 +481,7 @@ namespace BlockBuilder
             // ---- Catalog search (not persisted) ----
             AddBinding(m_Search = new ValueBinding<string>(kGroup, "search", "{\"total\":0,\"results\":[],\"groups\":[],\"themes\":[]}"));
             AddBinding(new TriggerBinding<string>(kGroup, "setSearchText", s => { m_SearchText = s ?? string.Empty; m_SearchKey = null; }));
-            AddBinding(new TriggerBinding<string>(kGroup, "setSearchGroup", g => { m_SearchGroup = kGroups.Any(x => x.Id == g) || g == kFavorites || g == kRecent ? g : string.Empty; m_SearchCategory = -1; m_SearchKey = null; }));
+            AddBinding(new TriggerBinding<string>(kGroup, "setSearchGroup", g => { m_SearchGroup = kGroups.Any(x => x.Id == g) || g == kFavorites || g == kRecent || g == kInList ? g : string.Empty; m_SearchCategory = -1; m_SearchKey = null; }));
             AddBinding(new TriggerBinding<int>(kGroup, "setSearchCategory", c =>
             {
                 // A sub-category of the open group, or -1 for the whole group.
@@ -538,6 +538,8 @@ namespace BlockBuilder
         /// <summary>Not uses but personal shortcuts: starred buildings and the ones added lately.</summary>
         private const string kFavorites = "favorites";
         private const string kRecent = "recent";
+        private const string kInList = "inlist";
+        private int m_InListCount;
 
         /// <summary>Use groups as the game's zoning menu shows them, with its own icons.</summary>
         private static readonly UseGroup[] kGroups =
@@ -792,6 +794,13 @@ namespace BlockBuilder
             }
 
             m_RecentCount = matches.Count(b => recentRank.ContainsKey(b.Name));
+            var listed = new HashSet<string>(PaletteStore.Get(options?.ActivePalette ?? 0)?.Entries.Select(e => e.Prefab) ?? Enumerable.Empty<string>());
+            m_InListCount = matches.Count(b => listed.Contains(b.Name));
+            if (m_SearchGroup == kInList)
+            {
+                return matches.Where(b => listed.Contains(b.Name)).ToList();
+            }
+
             if (m_SearchGroup == kFavorites)
             {
                 return matches.Where(b => favorites.Contains(b.Name)).ToList();
@@ -851,6 +860,7 @@ namespace BlockBuilder
             Prop(sb, "anyCount", counts.Values.Sum());
             Prop(sb, "favoriteCount", m_FavoriteCount);
             Prop(sb, "recentCount", m_RecentCount);
+            Prop(sb, "inListCount", m_InListCount);
             Prop(sb, "level", m_SearchLevel);
             Prop(sb, "theme", m_SearchTheme);
             Prop(sb, "width", m_SearchWidth);
