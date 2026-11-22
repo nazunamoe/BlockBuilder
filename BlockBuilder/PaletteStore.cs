@@ -42,19 +42,27 @@ namespace BlockBuilder
                 System.IO.Directory.CreateDirectory(Directory);
                 foreach (var file in System.IO.Directory.GetFiles(Directory, "*.txt").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
                 {
-                    var errors = new List<string>();
-                    var palette = Palette.Parse(File.ReadAllText(file, Encoding.UTF8), errors);
-                    if (string.IsNullOrWhiteSpace(palette.Name))
+                    // One unreadable file (locked, no permission) must not hide the lists after it.
+                    try
                     {
-                        palette.Name = Path.GetFileNameWithoutExtension(file);
-                    }
+                        var errors = new List<string>();
+                        var palette = Palette.Parse(File.ReadAllText(file, Encoding.UTF8), errors);
+                        if (string.IsNullOrWhiteSpace(palette.Name))
+                        {
+                            palette.Name = Path.GetFileNameWithoutExtension(file);
+                        }
 
-                    foreach (var e in errors)
+                        foreach (var e in errors)
+                        {
+                            Mod.log.Warn($"palette {Path.GetFileName(file)}: {e}");
+                        }
+
+                        list.Add((file, palette));
+                    }
+                    catch (Exception e)
                     {
-                        Mod.log.Warn($"palette {Path.GetFileName(file)}: {e}");
+                        Mod.log.Warn($"palette {Path.GetFileName(file)} skipped: {e.Message}");
                     }
-
-                    list.Add((file, palette));
                 }
             }
             catch (Exception e)
@@ -74,23 +82,56 @@ namespace BlockBuilder
 
         public static string Save(Palette palette)
         {
-            System.IO.Directory.CreateDirectory(Directory);
-            string path = PathFor(palette.Name);
-            File.WriteAllText(path, palette.Serialize(), new UTF8Encoding(false));
-            Reload();
-            Mod.log.Info($"palette saved: {path} ({palette.Entries.Count} entries)");
-            return path;
+            try
+            {
+                System.IO.Directory.CreateDirectory(Directory);
+                string path = PathFor(palette.Name);
+                File.WriteAllText(path, palette.Serialize(), new UTF8Encoding(false));
+                Reload();
+                Mod.log.Info($"palette saved: {path} ({palette.Entries.Count} entries)");
+                return path;
+            }
+            catch (Exception e)
+            {
+                Mod.log.Warn($"palette '{palette.Name}' could not be saved: {e.Message}");
+                return null;
+            }
         }
+
+        private const int kMaxFileStem = 100;
+
+        private static readonly HashSet<string> kReserved = new HashSet<string>
+        {
+            "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
 
         private static string PathFor(string name)
         {
             name = string.IsNullOrWhiteSpace(name) ? "palette" : name.Trim();
-            var safe = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray()).Trim();
+            var invalid = Path.GetInvalidFileNameChars();
+            var safe = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim().TrimEnd('.');
+            if (safe.Length > kMaxFileStem)
+            {
+                safe = safe.Substring(0, kMaxFileStem).TrimEnd();
+            }
+
+            // Windows treats CON.txt, NUL.txt, COM1.txt ... as devices, not files.
+            if (safe.Length == 0 || kReserved.Contains(safe.ToUpperInvariant()))
+            {
+                safe = "_" + safe;
+            }
+
             return Path.Combine(Directory, safe + ".txt");
         }
 
         public static int IndexOf(string path)
         {
+            if (string.IsNullOrEmpty(path))
+            {
+                return -1;
+            }
+
             var all = All;
             for (int i = 0; i < all.Count; i++)
             {
@@ -125,7 +166,16 @@ namespace BlockBuilder
                 return;
             }
 
-            File.WriteAllText(all[index].Path, all[index].Palette.Serialize(), new UTF8Encoding(false));
+            try
+            {
+                File.WriteAllText(all[index].Path, all[index].Palette.Serialize(), new UTF8Encoding(false));
+            }
+            catch (Exception e)
+            {
+                // The change stays in memory for this session; say so instead of throwing into the UI.
+                Mod.log.Warn($"palette {Path.GetFileName(all[index].Path)} could not be written: {e.Message}");
+            }
+
             Version++;
         }
 
@@ -137,8 +187,16 @@ namespace BlockBuilder
                 return;
             }
 
-            File.Delete(all[index].Path);
-            Mod.log.Info($"palette deleted: {all[index].Path}");
+            try
+            {
+                File.Delete(all[index].Path);
+                Mod.log.Info($"palette deleted: {all[index].Path}");
+            }
+            catch (Exception e)
+            {
+                Mod.log.Warn($"palette {Path.GetFileName(all[index].Path)} could not be deleted: {e.Message}");
+            }
+
             Reload();
         }
 
@@ -159,11 +217,20 @@ namespace BlockBuilder
                 target = PathFor(newName);
             }
 
-            palette.Name = newName.Trim();
-            File.WriteAllText(target, palette.Serialize(), new UTF8Encoding(false));
-            if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(oldPath), StringComparison.OrdinalIgnoreCase))
+            try
             {
-                File.Delete(oldPath);
+                palette.Name = newName.Trim();
+                File.WriteAllText(target, palette.Serialize(), new UTF8Encoding(false));
+                if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(oldPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(oldPath);
+                }
+            }
+            catch (Exception e)
+            {
+                Mod.log.Warn($"palette could not be renamed to '{newName}': {e.Message}");
+                Reload();
+                return null;
             }
 
             Reload();

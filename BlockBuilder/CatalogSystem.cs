@@ -93,7 +93,8 @@ namespace BlockBuilder
             base.OnGameLoadingComplete(purpose, mode);
             if (mode == GameMode.Game)
             {
-                Scan(true);
+                // The catalog file is a debug dump: written by the options button, not on every load.
+                Scan(false);
                 CreateStarterPalettes();
             }
         }
@@ -327,7 +328,7 @@ namespace BlockBuilder
 
         public BuildingEntry FindBuilding(string name)
         {
-            if (m_ByName == null || m_ByName.Count != Buildings.Count)
+            if (m_ByName == null)
             {
                 m_ByName = new Dictionary<string, BuildingEntry>(StringComparer.Ordinal);
                 foreach (var b in Buildings)

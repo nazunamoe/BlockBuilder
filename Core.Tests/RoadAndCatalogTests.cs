@@ -223,6 +223,21 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void Palette_Parse_KeepsWeightsUsable()
+        {
+            var errors = new List<string>();
+            var palette = Palette.Parse("a\tInfinity\t0\nb\tNaN\t0\nc\t99999\t999999999\nd\t-3\t-1\n", errors);
+            Assert.Equal(4, palette.Entries.Count);
+            Assert.Equal(1, palette.Entries[0].Weight);
+            Assert.Equal(1, palette.Entries[1].Weight);
+            Assert.Equal(1000, palette.Entries[2].Weight);
+            Assert.Equal(100000, palette.Entries[2].MaxCount);
+            Assert.Equal(0, palette.Entries[3].Weight);
+            Assert.Equal(0, palette.Entries[3].MaxCount);
+            Assert.All(palette.Entries, e => Assert.True(!double.IsNaN(e.Weight) && !double.IsInfinity(e.Weight)));
+        }
+
+        [Fact]
         public void Palette_ToItems_ConvertsCellsAndReportsMissing()
         {
             var catalog = new Dictionary<string, CatalogItem>

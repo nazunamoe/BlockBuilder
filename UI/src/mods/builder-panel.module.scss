@@ -1695,15 +1695,57 @@ $radius: 6rem;
 .sizeBar {
     width: 100%;
     display: flex;
-    flex-direction: row;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
     margin-bottom: 6rem;
     padding: 4rem 6rem;
     background-color: $surface;
     border-radius: $radius;
 }
 
-.sizeBarPart {
-    flex: 1;
-    min-width: 0;
+// One row per axis: name, smallest, largest (and Reset at the end of the first row).
+.sizeBarRow {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 3rem 0;
+
+    .rangeBlock {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chip {
+        flex: none;
+        margin-left: 10rem;
+    }
+}
+
+.rangeInline {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+
+    .rangeTitle {
+        width: 64rem;
+        flex: none;
+        font-size: 13rem;
+        color: $text;
+    }
+
+    .rangeRow {
+        flex: 1;
+        margin-top: 0;
+        justify-content: flex-start;
+    }
+
+    .rangePart {
+        margin-right: 26rem;
+    }
+
+    .rangeValue {
+        width: 52rem;
+    }
 }

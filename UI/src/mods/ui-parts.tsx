@@ -194,7 +194,10 @@ export const RangeFilter = ({
     anyLabel,
     onMin,
     onMax,
+    inline,
 }: {
+    /** Title on the left of the two steppers instead of above them. */
+    inline?: boolean;
     label: string;
     min: number;
     max: number;
@@ -217,7 +220,7 @@ export const RangeFilter = ({
         </div>
     );
     return (
-        <div className={styles.rangeBlock}>
+        <div className={`${styles.rangeBlock} ${inline ? styles.rangeInline : ""}`}>
             <span className={styles.rangeTitle}>{label}</span>
             <div className={styles.rangeRow}>
                 {part(minLabel, min, onMin)}

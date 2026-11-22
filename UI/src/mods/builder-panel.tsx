@@ -344,7 +344,7 @@ function ListContents({ state, lists, t, onAdd, gridMax, rem }: { state: Builder
             const d = parseInt(m[2], 10);
             return w >= range.minW && (range.maxW === 0 || w <= range.maxW) && d >= range.minD && (range.maxD === 0 || d <= range.maxD);
         });
-    const listHeight = Math.max(100, gridMax - (sizeOpen ? 56 * rem : 0));
+    const listHeight = Math.max(100, gridMax - (sizeOpen ? 84 * rem : 0));
 
     return (
         <>
@@ -395,15 +395,15 @@ function ListContents({ state, lists, t, onAdd, gridMax, rem }: { state: Builder
 
             {sizeOpen && (
                 <div className={styles.sizeBar}>
-                    <div className={styles.sizeBarPart}>
-                        <RangeFilter label={t("lotWidth")} min={range.minW} max={range.maxW} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minW: v })} onMax={(v) => setRange({ maxW: v })} />
+                    <div className={styles.sizeBarRow}>
+                        <RangeFilter inline label={t("lotWidth")} min={range.minW} max={range.maxW} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minW: v })} onMax={(v) => setRange({ maxW: v })} />
+                        <button className={styles.chip} disabled={!limited} onClick={() => setRange({ minW: 0, maxW: 0, minD: 0, maxD: 0 })}>
+                            {t("sizeReset")}
+                        </button>
                     </div>
-                    <div className={styles.sizeBarPart}>
-                        <RangeFilter label={t("lotDepth")} min={range.minD} max={range.maxD} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minD: v })} onMax={(v) => setRange({ maxD: v })} />
+                    <div className={styles.sizeBarRow}>
+                        <RangeFilter inline label={t("lotDepth")} min={range.minD} max={range.maxD} minLabel={t("sizeMin")} maxLabel={t("sizeMax")} anyLabel={t("anySize")} onMin={(v) => setRange({ minD: v })} onMax={(v) => setRange({ maxD: v })} />
                     </div>
-                    <button className={styles.chip} disabled={!limited} onClick={() => setRange({ minW: 0, maxW: 0, minD: 0, maxD: 0 })}>
-                        {t("sizeReset")}
-                    </button>
                 </div>
             )}
 

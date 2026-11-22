@@ -60,6 +60,9 @@ namespace BlockBuilder.Core
             return sb.ToString();
         }
 
+        private const double kMaxWeight = 1000;
+        private const int kMaxCount = 100000;
+
         public static Palette Parse(string text, List<string> errors = null)
         {
             var palette = new Palette();
@@ -106,7 +109,14 @@ namespace BlockBuilder.Core
                     max = 0;
                 }
 
-                palette.Add(prefab, Math.Max(0, weight), Math.Max(0, max));
+                // Hand-edited or shared files: NaN, Infinity or absurd values would upset the picker.
+                if (double.IsNaN(weight) || double.IsInfinity(weight))
+                {
+                    errors?.Add($"line {lineNumber}: weight is not a usable number");
+                    weight = 1;
+                }
+
+                palette.Add(prefab, Math.Min(kMaxWeight, Math.Max(0, weight)), Math.Min(kMaxCount, Math.Max(0, max)));
             }
 
             return palette;
