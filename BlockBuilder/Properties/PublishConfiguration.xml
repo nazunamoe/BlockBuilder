@@ -61,7 +61,7 @@
 **테스트 버전입니다.** 초기 버전이니 잃어도 되는 도시에서 먼저 써 보시고, 문제는 Logs 폴더의 BlockBuilder.log 와 함께 알려 주세요.
 	</LongDescription>
 	<!--Thumbnail-->
-	<Thumbnail Value="Properties/Thumbnail.png" />
+	<Thumbnail Value="Properties/Thumbnail.jpg" />
 	<!--Screenshot, can be set multiple times-->
 	<Screenshot Value="" />
 	<!--Tag, can be set multiple times-->
