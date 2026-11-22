@@ -63,7 +63,13 @@
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.jpg" />
 	<!--Screenshot, can be set multiple times-->
-	<Screenshot Value="" />
+	<Screenshot Value="Properties/screenshot1.jpg" />
+	<Screenshot Value="Properties/screenshot2.jpg" />
+	<Screenshot Value="Properties/screenshot3.jpg" />
+	<Screenshot Value="Properties/screenshot4.jpg" />
+	<Screenshot Value="Properties/screenshot5.jpg" />
+	<Screenshot Value="Properties/screenshot6.jpg" />
+	<Screenshot Value="Properties/screenshot7.jpg" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
