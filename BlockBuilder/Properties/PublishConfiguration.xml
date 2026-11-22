@@ -4,11 +4,61 @@
 	<!--Name of the mod to display to players-->
 	<DisplayName Value="BlockBuilder" />
 	<!--Short description of the mod-->
-	<ShortDescription Value="This is a short description" />
+	<ShortDescription Value="Paint an area on the map and fill it with your chosen buildings, parks and parking, aligned to the roads. Optional new streets, per-building weights and limits. 지도에 영역을 칠하면 고른 건물을 도로에 맞춰 채워 줍니다." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="This is a long description" /-->
 	<LongDescription>
-This is a long description
+**Block Builder** fills an area you paint (or draw) with the buildings, parks and parking lots you choose, aligned to the curb and facing the road, like a lot-packing puzzle. If the area is deep enough it can also lay the streets for you.
+
+**How it works**
+- Open the panel with the toolbar button or **Ctrl+Shift+B** (rebindable in the options).
+- Paint an area with the brush (or draw it point by point). A live preview shows every building.
+- Press **Build**. Use **Shuffle** for another arrangement, **Optimize** to pack tighter.
+
+**Features**
+- Lists of buildings you manage in the panel: create, duplicate, rename, delete, check only the ones you want to use. Lists are plain text files in ModsData/BlockBuilder/palettes, so you can share them.
+- Add-buildings view with big pictures, search by name, use (residential, commercial, office, industrial, services, parks, parking), level, lot size (min/max), source (base game or mods), favorites and recently added.
+- Per building: how often it is picked and the maximum number per build.
+- Fill density (relaxed, normal, dense, custom), size order, road order, optional new streets inside deep areas.
+- Move a building in the preview with Ctrl+drag, place one by hand with Shift+click.
+- Brush can stop at roads or cross them; the area edge snaps to the curb and avoids existing buildings.
+- Optional tree fill for the empty ground.
+- Undo the last build (experimental).
+- English and Korean.
+
+**Optional mods**
+- Anarchy: shows its toggle in the panel; allows overlapping lots with the custom density setting.
+- Tree Controller: use its tree sets for the tree fill.
+- Growable (zoned) buildings can only be placed as ordinary buildings with Plop the Growables.
+
+**Test version.** This is an early release. Please try it on a city you can afford to lose and report problems with the BlockBuilder.log file (Logs folder).
+
+---
+
+**Block Builder** 는 칠하거나 그린 영역을 고른 건물, 공원, 주차장으로 채워 줍니다. 필지를 연석에 맞추고 도로를 바라보게 놓으며, 영역이 충분히 깊으면 내부 도로도 깔아 줍니다.
+
+**사용법**
+- 툴바 버튼 또는 **Ctrl+Shift+B**(옵션에서 변경 가능)로 패널을 엽니다.
+- 브러시로 영역을 칠하거나 꼭짓점을 찍어 그립니다. 미리보기에 건물이 바로 보입니다.
+- **짓기**를 누릅니다. **배치 섞기**로 다른 배치, **최적화**로 더 촘촘한 배치를 만듭니다.
+
+**기능**
+- 패널에서 건물 리스트 관리: 새로 만들기, 복제, 이름 변경, 삭제, 쓸 건물만 체크. 리스트는 ModsData/BlockBuilder/palettes 의 텍스트 파일이라 공유할 수 있습니다.
+- 큰 그림으로 건물을 고르는 추가 화면: 이름 검색, 용도(주거, 상업, 사무, 산업, 서비스, 공원, 주차장), 레벨, 필지 크기(최소/최대), 출처(기본/모드), 즐겨찾기, 최근 추가.
+- 건물마다 선택 비중과 최대 개수 지정.
+- 채움 강도(여유, 보통, 촘촘, 사용자 지정), 크기 순서, 도로 순서, 깊은 영역의 내부 도로 생성.
+- 미리보기에서 Ctrl+드래그로 건물 이동, Shift+클릭으로 직접 놓기.
+- 브러시가 도로에서 멈추거나 건널 수 있고, 영역 경계는 연석에 맞춰지며 기존 건물을 피합니다.
+- 빈 땅 나무 심기(선택).
+- 마지막 건설 되돌리기(실험적).
+- 영어, 한국어 지원.
+
+**선택 모드**
+- Anarchy: 패널에서 켜고 끌 수 있고, 사용자 지정 채움 강도에서 필지 겹침을 허용합니다.
+- Tree Controller: 나무 심기에 그 모드의 나무 세트를 사용합니다.
+- 성장형(구역) 건물을 일반 건물로 놓으려면 Plop the Growables 가 필요합니다.
+
+**테스트 버전입니다.** 초기 버전이니 잃어도 되는 도시에서 먼저 써 보시고, 문제는 Logs 폴더의 BlockBuilder.log 와 함께 알려 주세요.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
@@ -19,7 +69,7 @@ This is a long description
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.0" />
+	<ModVersion Value="0.1.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.0.*" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -27,7 +77,7 @@ This is a long description
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="" />
+	<ChangeLog Value="First public test version." />
 	<!--<ChangeLog>
 	</ChangeLog>-->
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "twitter", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme", "bluesky"-->
