@@ -142,15 +142,10 @@ function Actions({ state, t }: { state: BuilderState; t: Tr }) {
                     className={`${styles.actionButton} ${styles.actionHalf}`}
                     disabled={state.undoCount === 0 || state.undoing}
                     title={t("undoHint")}
-                    onClick={() => {
-                        if (state.planned || state.buildings + state.streets > 0) {
-                            setConfirmUndo(true);
-                        } else {
-                            actions.undoBuild();
-                        }
-                    }}
+                    // Always asks first: it deletes things in the city.
+                    onClick={() => setConfirmUndo(true)}
                 >
-                    {t("undoBuild")}
+                    {t("undoLabel")}
                 </button>
             </div>
         </div>
