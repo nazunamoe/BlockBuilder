@@ -257,6 +257,37 @@ namespace BlockBuilder.Core.Tests
         }
 
         [Fact]
+        public void UniqueBuilding_IsUniqueObjectOrSignature()
+        {
+            Assert.True(new CatalogItem { Kind = ItemKind.Service | ItemKind.Unique }.IsUniqueBuilding);
+            Assert.True(new CatalogItem { Kind = ItemKind.Growable | ItemKind.Signature }.IsUniqueBuilding);
+            Assert.False(new CatalogItem { Kind = ItemKind.Growable }.IsUniqueBuilding);
+            Assert.False(new CatalogItem { Kind = ItemKind.Service | ItemKind.Park }.IsUniqueBuilding);
+            // Marking a building unique must not change its use category.
+            Assert.Equal(ItemCategory.Service, new CatalogItem { Kind = ItemKind.Service | ItemKind.Unique }.Category);
+        }
+
+        [Fact]
+        public void Palette_ToItems_CapsUniqueBuildingsAtOne()
+        {
+            var catalog = new Dictionary<string, CatalogItem>
+            {
+                ["landmark"] = new CatalogItem { Name = "landmark", Kind = ItemKind.Service | ItemKind.Unique, LotWidth = 4, LotDepth = 4 },
+                ["sig"] = new CatalogItem { Name = "sig", Kind = ItemKind.Growable | ItemKind.Signature, LotWidth = 2, LotDepth = 2 },
+                ["house"] = new CatalogItem { Name = "house", Kind = ItemKind.Growable, LotWidth = 1, LotDepth = 1 },
+            };
+            var palette = new Palette();
+            palette.Add("landmark");        // unlimited in the file
+            palette.Add("sig", 1, 5);       // hand-edited to 5
+            palette.Add("house", 1, 5);
+            palette.Add("house2");
+            var items = palette.ToItems(n => catalog.TryGetValue(n, out var c) ? c : null);
+            Assert.Equal(1, items.Single(i => i.Id == "landmark").MaxCount);
+            Assert.Equal(1, items.Single(i => i.Id == "sig").MaxCount);
+            Assert.Equal(5, items.Single(i => i.Id == "house").MaxCount);
+        }
+
+        [Fact]
         public void Polyline_SimplifiesStraightRuns()
         {
             var straight = Enumerable.Range(0, 20).Select(i => new Vec2(i * 4, 0)).ToList();

@@ -575,6 +575,8 @@ namespace BlockBuilder
             public string Icon;
             /// <summary>Categories in the group; shown as sub-filters when there is more than one.</summary>
             public UseSub[] Subs;
+            /// <summary>Set for a group that cuts across uses (unique buildings): it picks by this instead of by category.</summary>
+            public System.Func<Core.CatalogItem, bool> Match;
         }
 
         private static UseSub Sub(Core.ItemCategory c, string en, string ko, string icon) => new UseSub { Category = c, En = en, Ko = ko, Icon = icon };
@@ -639,6 +641,13 @@ namespace BlockBuilder
             {
                 Id = "parking", En = "Parking", Ko = "주차장", Icon = kIcons + "Parking.svg",
                 Subs = new[] { Sub(Core.ItemCategory.Parking, "Parking", "주차장", kIcons + "Parking.svg") },
+            },
+            new UseGroup
+            {
+                // Landmarks and signature buildings, whatever their use; the game allows one of each per city.
+                Id = "unique", En = "Unique", Ko = "고유건물", Icon = kIcons + "Unique.svg",
+                Subs = new UseSub[0],
+                Match = item => item.IsUniqueBuilding,
             },
             new UseGroup
             {
@@ -810,6 +819,8 @@ namespace BlockBuilder
         // Set by the last Search: matches that are starred / recently added.
         private int m_FavoriteCount;
         private int m_RecentCount;
+        // Every match of the last Search before the use group applies (group counts that cut across uses).
+        private List<BuildingEntry> m_AnyUseMatches = new List<BuildingEntry>();
 
         /// <summary>
         /// Buildings matching every filter; <paramref name="counts"/> gets the matches per category
@@ -824,6 +835,7 @@ namespace BlockBuilder
             }
 
             var matches = SearchAnyUse();
+            m_AnyUseMatches = matches;
             foreach (var b in matches)
             {
                 var c = b.Item.Category;
@@ -863,6 +875,11 @@ namespace BlockBuilder
             if (group == null)
             {
                 return matches;
+            }
+
+            if (group.Match != null)
+            {
+                return matches.Where(b => group.Match(b.Item)).ToList();
             }
 
             var uses = m_SearchCategory >= 0
@@ -947,7 +964,9 @@ namespace BlockBuilder
             first = true;
             foreach (var g in kGroups)
             {
-                int groupCount = g.Subs.Sum(s => counts.TryGetValue(s.Category, out int n) ? n : 0);
+                int groupCount = g.Match != null
+                    ? m_AnyUseMatches.Count(b => g.Match(b.Item))
+                    : g.Subs.Sum(s => counts.TryGetValue(s.Category, out int n) ? n : 0);
                 if (g.Id == "other" && groupCount == 0 && m_SearchGroup != g.Id)
                 {
                     continue; // only shown when something is unclassified
@@ -1163,7 +1182,8 @@ namespace BlockBuilder
                     Prop(sb, "size", building != null ? $"{building.LotWidth}x{building.LotDepth}" : "?");
                     Prop(sb, "thumb", Thumb(building));
                     Prop(sb, "weight", (int)System.Math.Round(entry.Weight));
-                    Prop(sb, "max", entry.MaxCount);
+                    // A unique building is capped at one per city whatever the file says (Palette.ToItems).
+                    Prop(sb, "max", building != null && building.Item.IsUniqueBuilding ? 1 : entry.MaxCount);
                     Prop(sb, "loaded", building != null || !m_Catalog.Ready);
                     Prop(sb, "checked", o.Checked.Contains(entry.Prefab), last: true);
                     sb.Append('}');

@@ -14,6 +14,8 @@ namespace BlockBuilder.Core
         Service = 8,
         Signature = 16,
         Upgrade = 32,
+        /// <summary>UniqueObjectData: the game lets only one exist per city (landmarks, unique services).</summary>
+        Unique = 64,
     }
 
     /// <summary>
@@ -58,6 +60,12 @@ namespace BlockBuilder.Core
         public string Theme => Classifier.Theme(Zone);
         public bool Waterfront => Zone.IndexOf("Waterfront", StringComparison.OrdinalIgnoreCase) >= 0;
         public bool IsSignature => (Kind & ItemKind.Signature) != 0;
+
+        /// <summary>
+        /// A "unique building": a game unique object (landmark) or a signature building. The game
+        /// allows one of each per city, so a fill places at most one (see Palette.ToItems).
+        /// </summary>
+        public bool IsUniqueBuilding => (Kind & (ItemKind.Unique | ItemKind.Signature)) != 0;
     }
 
     public static class Classifier

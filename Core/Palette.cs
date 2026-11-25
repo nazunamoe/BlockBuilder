@@ -141,7 +141,8 @@ namespace BlockBuilder.Core
                     Width = c.LotWidth * 8,
                     Depth = c.LotDepth * 8,
                     Weight = e.Weight,
-                    MaxCount = e.MaxCount,
+                    // One per city: a second copy is refused by the game, or (with Anarchy) would be a duplicate.
+                    MaxCount = c.IsUniqueBuilding ? 1 : e.MaxCount,
                     RequiresRoad = c.RequiresRoad,
                 });
             }

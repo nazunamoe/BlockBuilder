@@ -21,6 +21,7 @@ namespace BlockBuilder
         Service = 8,
         Signature = 16,
         Upgrade = 32,
+        Unique = 64,
     }
 
     public sealed class BuildingEntry
@@ -133,7 +134,7 @@ namespace BlockBuilder
                 ScanRoads();
                 ScanTrees();
                 Ready = true;
-                Mod.log.Info($"catalog: buildings={Buildings.Count} growable={Count(EntryKind.Growable)} park={Count(EntryKind.Park)} parking={Count(EntryKind.Parking)} service={Count(EntryKind.Service)} signature={Count(EntryKind.Signature)} upgrade={Count(EntryKind.Upgrade)} roads={Roads.Count}");
+                Mod.log.Info($"catalog: buildings={Buildings.Count} growable={Count(EntryKind.Growable)} park={Count(EntryKind.Park)} parking={Count(EntryKind.Parking)} service={Count(EntryKind.Service)} signature={Count(EntryKind.Signature)} unique={Count(EntryKind.Unique)} uniqueOrSignature={Buildings.Count(b => b.Item.IsUniqueBuilding)} upgrade={Count(EntryKind.Upgrade)} roads={Roads.Count}");
                 if (write)
                 {
                     Write();
@@ -210,6 +211,11 @@ namespace BlockBuilder
                 if (EntityManager.HasComponent<SignatureBuildingData>(e))
                 {
                     entry.Kind |= EntryKind.Signature;
+                }
+
+                if (EntityManager.HasComponent<UniqueObjectData>(e))
+                {
+                    entry.Kind |= EntryKind.Unique;
                 }
 
                 if (EntityManager.HasComponent<ServiceUpgradeData>(e))
