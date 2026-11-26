@@ -4,7 +4,7 @@ import { Scrollable } from "cs2/ui";
 import { useEffect, useRef, useState } from "react";
 import { actions, BuilderState, DENSITY, EntryInfo, Lists, listsBinding, parseLists, parseSearch, parseState, Search, searchBinding, SNAP_ANGLE, SNAP_CELL, SNAP_CURB, stateBinding } from "mods/bindings";
 import { T } from "mods/texts";
-import { Check, Glyph, loadJson, NamePrompt, saveJson, Segmented, RangeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
+import { Check, EDGE_GAP, Glyph, loadJson, NamePrompt, saveJson, Segmented, RangeFilter, Stepper, Switch, TextField, useDraggable } from "mods/ui-parts";
 import styles from "./builder-panel.module.scss";
 
 /** The game's own tool options toolbar (snapping buttons), shown inside the builder panel. */
@@ -998,7 +998,8 @@ export const BuilderPanel = () => {
     const state = parseState(useValue(stateBinding));
     const lists = parseLists(useValue(listsBinding));
     const search = parseSearch(useValue(searchBinding));
-    const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, { width: PANEL_WIDTH, height: 600 });
+    const windowRef = useRef<HTMLDivElement>(null);
+    const { pos, onHandleDown, reset } = useDraggable(POS_KEY, DEFAULT_POS, windowRef);
     const [tab, setTabState] = useState<Tab>(() => (loadJson(TAB_KEY, { tab: "buildings" }).tab === "settings" ? "settings" : "buildings"));
     const [adding, setAdding] = useState(false);
     const addingNow = adding && tab === "buildings";
@@ -1010,7 +1011,6 @@ export const BuilderPanel = () => {
     // right edge is drawn further left.
     // The game's UI host lays out a frame or more after React commits, so the window is measured
     // after each render and again for a few frames after it opens.
-    const windowRef = useRef<HTMLDivElement>(null);
     const titleRef = useRef<HTMLDivElement>(null);
     const [metrics, setMetrics] = useState({ pane: 500, rem: 1 });
     const [shiftLeft, setShiftLeft] = useState(0);
@@ -1034,7 +1034,7 @@ export const BuilderPanel = () => {
         if (Math.abs(pane - metrics.pane) > 2 || Math.abs(rem - metrics.rem) > 0.01) {
             setMetrics({ pane, rem });
         }
-        const shift = Math.min(pos.x, Math.max(0, Math.ceil(pos.x + wr.width - screenW + 8)));
+        const shift = Math.min(pos.x, Math.max(0, Math.ceil(pos.x + wr.width - screenW + EDGE_GAP)));
         if (Math.abs(shift - shiftLeft) > 2) {
             setShiftLeft(shift);
         }

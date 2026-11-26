@@ -25,11 +25,15 @@ export interface Position {
     y: number;
 }
 
+/** Space in px kept between a floating window and the right edge of the screen. */
+export const EDGE_GAP = 8;
+
 /**
  * Drag a floating window by its handle. The position is kept inside the screen and remembered
- * between sessions.
+ * between sessions. The width is read from the window element, as its CSS size is in rem and
+ * positions are in px.
  */
-export function useDraggable(storageKey: string, initial: Position, size: { width: number; height: number }) {
+export function useDraggable(storageKey: string, initial: Position, windowRef: React.RefObject<HTMLElement>) {
     const [pos, setPos] = useState<Position>(() => loadJson(storageKey, initial));
     const drag = useRef<{ dx: number; dy: number } | null>(null);
     const latest = useRef(pos);
@@ -37,11 +41,13 @@ export function useDraggable(storageKey: string, initial: Position, size: { widt
 
     const clamp = useCallback(
         (p: Position): Position => {
-            const maxX = Math.max(0, window.innerWidth - Math.min(size.width, window.innerWidth));
+            const width = windowRef.current?.getBoundingClientRect().width ?? 0;
+            // Closed or not laid out yet: only keep a corner of the window reachable.
+            const maxX = Math.max(0, window.innerWidth - (width > 0 ? width + EDGE_GAP : 48));
             const maxY = Math.max(0, window.innerHeight - 48);
             return { x: Math.min(Math.max(0, p.x), maxX), y: Math.min(Math.max(0, p.y), maxY) };
         },
-        [size.width]
+        [windowRef]
     );
 
     useEffect(() => {
@@ -76,7 +82,12 @@ export function useDraggable(storageKey: string, initial: Position, size: { widt
         if (e.button !== 0) {
             return;
         }
-        drag.current = { dx: e.clientX - latest.current.x, dy: e.clientY - latest.current.y };
+        // A remembered position can be past the limit (other screen size). Start from where the
+        // window is drawn, or the mouse would have to travel the difference before it moves.
+        const start = clamp(latest.current);
+        latest.current = start;
+        setPos(start);
+        drag.current = { dx: e.clientX - start.x, dy: e.clientY - start.y };
         e.preventDefault();
         e.stopPropagation();
     };
