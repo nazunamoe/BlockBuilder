@@ -1008,11 +1008,13 @@ export const BuilderPanel = () => {
     // what is left below the title bar down to the screen bottom, and never more than PANE_MAX_REM,
     // so the window stays short even if the screen size is misreported. A window dragged near the
     // right edge is drawn further left.
+    // The game's UI host lays out a frame or more after React commits, so the window is measured
+    // after each render and again for a few frames after it opens.
     const windowRef = useRef<HTMLDivElement>(null);
     const titleRef = useRef<HTMLDivElement>(null);
     const [metrics, setMetrics] = useState({ pane: 500, rem: 1 });
     const [shiftLeft, setShiftLeft] = useState(0);
-    useEffect(() => {
+    const measure = () => {
         const w = windowRef.current;
         const title = titleRef.current;
         if (!w || !title) {
@@ -1021,7 +1023,12 @@ export const BuilderPanel = () => {
         const screen = window.innerHeight || document.documentElement.clientHeight || 1080;
         const screenW = window.innerWidth || document.documentElement.clientWidth || 1920;
         const wr = w.getBoundingClientRect();
-        const rem = wr.width > 0 ? wr.width / PANEL_WIDTH : 1;
+        // Not laid out yet: keep the current size instead of assuming 1 px per rem. A rem is
+        // never anywhere near as small as a fifth of a pixel on a real screen.
+        if (wr.width < PANEL_WIDTH * 0.2) {
+            return;
+        }
+        const rem = wr.width / PANEL_WIDTH;
         const available = Math.floor(screen - wr.top - title.getBoundingClientRect().height - 14);
         const pane = Math.max(160 * rem, Math.min(available, PANE_MAX_REM * rem));
         if (Math.abs(pane - metrics.pane) > 2 || Math.abs(rem - metrics.rem) > 0.01) {
@@ -1031,7 +1038,34 @@ export const BuilderPanel = () => {
         if (Math.abs(shift - shiftLeft) > 2) {
             setShiftLeft(shift);
         }
-    });
+    };
+    // The frame and timer callbacks below must see the latest position and metrics.
+    const measureRef = useRef(measure);
+    measureRef.current = measure;
+    useEffect(() => measureRef.current());
+    useEffect(() => {
+        if (!state.active) {
+            return;
+        }
+        const run = () => measureRef.current();
+        let frames = 10;
+        let frame = 0;
+        const step = () => {
+            run();
+            if (--frames > 0) {
+                frame = requestAnimationFrame(step);
+            }
+        };
+        frame = requestAnimationFrame(step);
+        // In case layout takes longer than those frames (first open while the game is busy).
+        const timers = [250, 1000].map((ms) => window.setTimeout(run, ms));
+        window.addEventListener("resize", run);
+        return () => {
+            cancelAnimationFrame(frame);
+            timers.forEach((id) => window.clearTimeout(id));
+            window.removeEventListener("resize", run);
+        };
+    }, [state.active]);
 
     if (!state.active) {
         return null;
