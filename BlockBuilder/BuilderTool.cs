@@ -280,8 +280,8 @@ namespace BlockBuilder
                 DrawOverlay();
                 return m_State == State.Planned ? ReplanIfChanged(options, inputDeps) : inputDeps;
             }
-            bool shiftLeft = shift && !overUI && mouse != null && mouse.leftButton.wasPressedThisFrame;
-            bool shiftRight = shift && !overUI && mouse != null && mouse.rightButton.wasPressedThisFrame;
+            bool shiftLeft = kDesignateEnabled && shift && !overUI && mouse != null && mouse.leftButton.wasPressedThisFrame;
+            bool shiftRight = kDesignateEnabled && shift && !overUI && mouse != null && mouse.rightButton.wasPressedThisFrame;
 
             if (shiftRight && m_State == State.Planned)
             {
@@ -732,7 +732,7 @@ namespace BlockBuilder
         /// <summary>Where a dragged lot goes: against the nearest road and facing it, or at the cursor.</summary>
         private Obb MoveTarget(Placement lot, Vec2 at) => SnapLot(lot.ItemId, lot.Box.Width, lot.Box.Depth, at, lot.Box.Forward);
 
-        private bool MoveFits(Placement lot, Obb box) => LotFits(box, lot);
+        private bool MoveFits(Placement lot, Obb box) => LotFits(box, m_Plan?.Placements ?? Enumerable.Empty<Placement>(), lot);
 
         /// <summary>
         /// A lot placed by hand (Shift+click or drag): against the nearest curb and facing the road,
@@ -751,12 +751,13 @@ namespace BlockBuilder
         }
 
         /// <summary>
-        /// A hand-placed lot may not overlap another lot of the plan, a road or an existing building:
-        /// one overlap error in the game blocks the whole build.
+        /// A hand-placed lot may not overlap the given lots, a road or an existing building: one
+        /// overlap error in the game blocks the whole build. Dragging passes every lot of the plan;
+        /// Shift+click only the pinned ones, as the automatic fill is redone around the new lot.
         /// </summary>
-        private bool LotFits(Obb box, Placement ignore)
+        private bool LotFits(Obb box, IEnumerable<Placement> lots, Placement ignore)
         {
-            foreach (var other in m_Plan?.Placements ?? Enumerable.Empty<Placement>())
+            foreach (var other in lots)
             {
                 if (!ReferenceEquals(other, ignore) && box.Overlaps(other.Box, 0.01))
                 {
@@ -1039,7 +1040,8 @@ namespace BlockBuilder
         private bool TryFitNear(string itemId, double w, double d, Vec2 at, out Obb fit)
         {
             var first = SnapLot(itemId, w, d, at, new Vec2(0, 1));
-            if (LotFits(first, null))
+            var pinned = m_Fixed.Concat(m_Frozen).ToList();
+            if (LotFits(first, pinned, null))
             {
                 fit = first;
                 return true;
@@ -1053,7 +1055,7 @@ namespace BlockBuilder
                 foreach (double sign in new[] { 1.0, -1.0 })
                 {
                     var box = SnapLot(itemId, w, d, at + along * (off * sign), first.Forward);
-                    if (LotFits(box, null))
+                    if (LotFits(box, pinned, null))
                     {
                         fit = box;
                         return true;
@@ -1066,20 +1068,20 @@ namespace BlockBuilder
         }
 
         /// <summary>
+        /// Shift+click placement is on hold: it always takes the largest building that fits, with no
+        /// way to choose one. Bringing it back needs this set to true and the panel parts and the
+        /// PlacedOnly option shown again (see DESIGN.md). Not const, so the unused code stays
+        /// warning-free.
+        /// </summary>
+        internal static readonly bool kDesignateEnabled = false;
+
+        /// <summary>
         /// Shift+click: out of the list (or the checked items) pick the building that best fills the
         /// free space at the cursor, i.e. the largest lot that still fits there flush against the
         /// nearest road, and pin it.
         /// </summary>
-        /// <summary>Shift+click placement is switched off for now (set to true to bring it back).</summary>
-        private const bool kDesignateEnabled = false;
-
         private void Designate(Setting options)
         {
-            if (!kDesignateEnabled)
-            {
-                return;
-            }
-
             var palette = PaletteStore.Get(options.ActivePalette);
             if (palette == null || palette.Entries.Count == 0)
             {
@@ -1095,11 +1097,19 @@ namespace BlockBuilder
             double bestArea = -1;
             double bestDist = double.MaxValue;
             int tried = 0;
+            bool uniqueSkipped = false;
             foreach (var e in palette.Entries)
             {
                 var entry = m_Catalog.FindBuilding(e.Prefab);
                 if (entry == null || !seen.Add(entry.Name) || (chosen != null && !chosen.Contains(entry.Name)))
                 {
+                    continue;
+                }
+
+                // One per city: never pin a second copy of a unique building (placed or moved by hand).
+                if (entry.Item.IsUniqueBuilding && m_Fixed.Concat(m_Frozen).Any(f => f.ItemId == entry.Name))
+                {
+                    uniqueSkipped = true;
                     continue;
                 }
 
@@ -1124,7 +1134,11 @@ namespace BlockBuilder
 
             if (bestName == null)
             {
-                if (tried == 0)
+                if (tried == 0 && uniqueSkipped)
+                {
+                    Note("the unique building is already placed (one per city)", "고유건물은 이미 놓았습니다 (도시에 하나만)");
+                }
+                else if (tried == 0)
                 {
                     Note("no loaded item in the list to place", "놓을 수 있는 항목이 리스트에 없습니다");
                 }
@@ -1199,7 +1213,7 @@ namespace BlockBuilder
             {
                 var chosen = options.Checked;
                 items = items.Where(i => chosen.Contains(i.Id)).ToList();
-                if (items.Count == 0 && !options.PlacedOnly)
+                if (items.Count == 0 && options.PlacementMode != FillMode.FixedOnly)
                 {
                     Note("no items checked; check items in the panel or switch to the whole list", "체크한 항목이 없습니다. 패널에서 항목을 체크하거나 '리스트 전체'로 바꾸세요");
                 }
@@ -1405,15 +1419,26 @@ namespace BlockBuilder
             var counts = new Dictionary<string, int>();
             foreach (var block in m_Regions)
             {
+                var fixedHere = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center) || (block == m_Regions[0] && !m_Regions.Any(r => Polygon.Contains(r.Ring, f.Box.Center)))).ToList();
+                // Lots pinned in other blocks use up max counts too. This block's own pins are left
+                // out: the engine counts them itself.
+                var fixedElsewhere = shared.Fixed.Where(f => !fixedHere.Contains(f)).ToList();
+                var used = new Dictionary<string, int>(counts);
+                foreach (var f in fixedElsewhere)
+                {
+                    used[f.ItemId] = (used.TryGetValue(f.ItemId, out int u) ? u : 0) + 1;
+                }
+
                 var request = new LayoutRequest
                 {
                     Boundary = block.Ring,
                     ExistingRoads = shared.ExistingRoads,
-                    Obstacles = shared.Obstacles,
+                    // A lot pinned in another block may reach into this one: fill around it.
+                    Obstacles = shared.Obstacles.Concat(fixedElsewhere.Select(f => f.Box)).ToList(),
                     // Each region its own seed, so neighbouring regions do not repeat the same sequence.
                     Options = RegionOptions(shared.Options, m_Regions.IndexOf(block)),
-                    Items = RemainingItems(shared.Items, counts),
-                    Fixed = shared.Fixed.Where(f => Polygon.Contains(block.Ring, f.Box.Center) || (block == m_Regions[0] && !m_Regions.Any(r => Polygon.Contains(r.Ring, f.Box.Center)))).ToList(),
+                    Items = RemainingItems(shared.Items, used),
+                    Fixed = fixedHere,
                 };
 
                 var result = LayoutEngine.Run(request);

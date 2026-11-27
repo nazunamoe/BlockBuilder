@@ -115,8 +115,11 @@ namespace BlockBuilder
         [SettingsUISection(kBuilderTab, kBuildGroup)]
         public ItemScope Scope { get; set; }
 
-        /// <summary>Off: build only what was placed with Shift+click.</summary>
-        [SettingsUISection(kBuilderTab, kBuildGroup)]
+        /// <summary>
+        /// Off: build only what was placed with Shift+click. Hidden while that is on hold
+        /// (BuilderTool.kDesignateEnabled); kept so saved settings still load.
+        /// </summary>
+        [SettingsUIHidden]
         public bool PlacedOnly { get; set; }
 
         /// <summary>Prefab names checked in the panel, one per line (shared across lists).</summary>
@@ -202,7 +205,8 @@ namespace BlockBuilder
             RecentItems = string.Join("\n", recent);
         }
 
-        internal Core.FillMode PlacementMode => PlacedOnly ? Core.FillMode.FixedOnly : Core.FillMode.Fill;
+        // A saved PlacedOnly must not leave builds empty while nothing can be placed by hand.
+        internal Core.FillMode PlacementMode => PlacedOnly && BuilderTool.kDesignateEnabled ? Core.FillMode.FixedOnly : Core.FillMode.Fill;
 
         /// <summary>Snap options (Game.Tools.Snap bits) turned off in the game's tool options panel. Default 0 = all on.</summary>
         [SettingsUIHidden]

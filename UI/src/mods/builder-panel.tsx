@@ -79,10 +79,6 @@ function StatusCard({ state, t }: { state: BuilderState; t: Tr }) {
                             <b>{state.streets}</b>
                             <span>{t("streets")}</span>
                         </div>
-                        <div className={styles.stat}>
-                            <b>{state.designated}</b>
-                            <span>{t("designated")}</span>
-                        </div>
                     </div>
                     <div className={styles.hint}>{t(state.picked ? "plannedHintPicked" : "plannedHint")}</div>
                 </>
@@ -241,7 +237,7 @@ function ListPicker({ state, lists, t }: { state: BuilderState; lists: Lists; t:
     );
 }
 
-/** The buildings of the current list: pick one to Shift+click, tick to fill with, remove with the X. */
+/** The buildings of the current list: pick one to set its weight and limit, tick to fill with, remove with the X. */
 /** Building picture from the game's own thumbnails; a blank tile when it has none. */
 function Thumb({ src, className }: { src: string; className: string }) {
     const [bad, setBad] = useState(false);
@@ -549,14 +545,18 @@ function EntryDetail({ entry, index, editable, t }: { entry: EntryInfo | null; i
             {editable ? (
                 <>
                     <Stepper label={t("weight")} value={entry.weight} unit="" step={1} display={`x${entry.weight}`} onChange={(v) => actions.setItemWeight(index, v)} />
-                    <Stepper
-                        label={t("maxCount")}
-                        value={entry.max}
-                        unit=""
-                        step={1}
-                        display={entry.max > 0 ? `${entry.max}` : t("noLimit")}
-                        onChange={(v) => actions.setItemMax(index, v)}
-                    />
+                    {entry.unique ? (
+                        <span className={styles.note}>{t("uniqueMax")}</span>
+                    ) : (
+                        <Stepper
+                            label={t("maxCount")}
+                            value={entry.max}
+                            unit=""
+                            step={1}
+                            display={entry.max > 0 ? `${entry.max}` : t("noLimit")}
+                            onChange={(v) => actions.setItemMax(index, v)}
+                        />
+                    )}
                     <span className={styles.note}>{t("weightHint")}</span>
                 </>
             ) : (
@@ -920,7 +920,6 @@ function PlacementSettings({ state, lists, t }: { state: BuilderState; lists: Li
             </Group>
 
             <Group title={t("options")}>
-                <Switch value={state.fillRest} onChange={actions.setFillRest} label={t("fillRest")} hint={t("fillRestHint")} />
                 <Switch value={state.generateRoads} onChange={actions.setGenerateRoads} label={t("generateRoads")} hint={t("generateRoadsHint")} />
                 {state.generateRoads && (
                     <div className={styles.indent}>

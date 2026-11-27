@@ -20,7 +20,7 @@
 - Add-buildings view with big pictures, search by name, use (residential, commercial, office, industrial, services, parks, parking), level, lot size (min/max), source (base game or mods), favorites and recently added.
 - Per building: how often it is picked and the maximum number per build.
 - Fill density (relaxed, normal, dense, custom), size order, road order, optional new streets inside deep areas.
-- Move a building in the preview with Ctrl+drag, place one by hand with Shift+click.
+- Move a building in the preview with Ctrl+drag.
 - Brush can stop at roads or cross them; the area edge snaps to the curb and avoids existing buildings.
 - Optional tree fill for the empty ground.
 - Undo the last build (experimental).
@@ -47,7 +47,7 @@
 - 큰 그림으로 건물을 고르는 추가 화면: 이름 검색, 용도(주거, 상업, 사무, 산업, 서비스, 공원, 주차장), 레벨, 필지 크기(최소/최대), 출처(기본/모드), 즐겨찾기, 최근 추가.
 - 건물마다 선택 비중과 최대 개수 지정.
 - 채움 강도(여유, 보통, 촘촘, 사용자 지정), 크기 순서, 도로 순서, 깊은 영역의 내부 도로 생성.
-- 미리보기에서 Ctrl+드래그로 건물 이동, Shift+클릭으로 직접 놓기.
+- 미리보기에서 Ctrl+드래그로 건물 이동.
 - 브러시가 도로에서 멈추거나 건널 수 있고, 영역 경계는 연석에 맞춰지며 기존 건물을 피합니다.
 - 빈 땅 나무 심기(선택).
 - 마지막 건설 되돌리기(실험적).

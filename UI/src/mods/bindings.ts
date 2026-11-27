@@ -63,6 +63,8 @@ export interface EntryInfo {
     weight: number;
     /** At most this many per build; 0 = no limit. */
     max: number;
+    /** Landmark or signature building: always at most one, so the limit cannot be changed. */
+    unique: boolean;
 }
 
 export interface Lists {

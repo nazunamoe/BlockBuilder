@@ -1184,6 +1184,7 @@ namespace BlockBuilder
                     Prop(sb, "weight", (int)System.Math.Round(entry.Weight));
                     // A unique building is capped at one per city whatever the file says (Palette.ToItems).
                     Prop(sb, "max", building != null && building.Item.IsUniqueBuilding ? 1 : entry.MaxCount);
+                    Prop(sb, "unique", building != null && building.Item.IsUniqueBuilding);
                     Prop(sb, "loaded", building != null || !m_Catalog.Ready);
                     Prop(sb, "checked", o.Checked.Contains(entry.Prefab), last: true);
                     sb.Append('}');
